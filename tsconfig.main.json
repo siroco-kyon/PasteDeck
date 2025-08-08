@@ -1,0 +1,53 @@
+{
+  "compilerOptions": {
+    // === Electron メインプロセス専用設定 ===
+    // 何をする部分か：Node.js環境でのTypeScriptコンパイル設定
+    // なぜ必要か：Electronメインプロセスは純粋なNode.js環境で動作するため
+    "target": "ES2020",
+    "lib": ["ES2020"],
+    "module": "CommonJS",
+    "skipLibCheck": true,
+    
+    // === 出力設定 ===
+    // 何をする部分か：コンパイル後のJavaScriptファイルの出力先を指定
+    // なぜ必要か：Electronが実行するメインプロセスファイルを生成するため
+    "outDir": "dist/main",
+    "rootDir": "src/main",
+    "noEmit": false,
+    "declaration": false,
+    "sourceMap": true,
+
+    // === Node.js環境設定 ===
+    // 何をする部分か：Node.js固有の型定義と機能を有効化
+    // なぜ必要か：fs、path、osなどのNode.jsモジュールを使用するため
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+
+    // === 厳密な型チェック ===
+    // 何をする部分か：メインプロセスでも厳密な型チェックを適用
+    // なぜ必要か：システムレベルの操作でのバグを防ぐため
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // === パス解決 ===
+    // 何をする部分か：メインプロセス内でのモジュール解決パスを設定
+    // なぜ必要か：共通型定義ファイルへのアクセスのため
+    "baseUrl": ".",
+    "paths": {
+      "@/shared/*": ["src/shared/*"]
+    }
+  },
+  "include": [
+    "src/main/**/*",
+    "src/shared/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "release"
+  ]
+}

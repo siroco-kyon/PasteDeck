@@ -1,0 +1,80 @@
+# === Electron Builder設定ファイル ===
+# 何をする部分か：各OS向けのアプリパッケージビルド設定を定義
+# なぜ必要か：Windows/Mac/Linux向けにインストーラー付きアプリを配布するため
+
+appId: com.clipboardmanager.app
+productName: "Clipboard Manager"
+
+# === ディレクトリ設定 ===
+# 何をする部分か：ビルド成果物の配置場所を指定
+# なぜ必要か：整理された出力先でアプリケーションを管理するため
+directories:
+  output: release
+  buildResources: resources
+
+# === ファイル設定 ===
+# 何をする部分か：アプリに含めるファイルとリソースを指定
+# なぜ必要か：必要最小限のファイルでアプリサイズを最適化するため
+files:
+  - dist/**/*
+  - node_modules/**/*
+  - package.json
+
+extraResources:
+  - from: resources
+    to: resources
+    filter: "**/*"
+
+# === セキュリティ設定 ===
+# 何をする部分か：アプリの署名とセキュリティポリシーを設定
+# なぞ必要か：OS標準のセキュリティ要件を満たし、ユーザーの信頼を得るため
+publish:
+  provider: generic
+
+# === Windows設定 ===
+# 何をする部分か：Windows向けのインストーラーとアプリ設定
+# なぜ必要か：Windows環境での正常なインストールと実行を保証するため
+win:
+  target: nsis
+  icon: resources/icon.ico
+  artifactName: "${productName}-${version}-${os}-${arch}.${ext}"
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+# === macOS設定 ===
+# 何をする部分か：macOS向けのDMGパッケージ設定
+# なぜ必要か：macOS環境での配布とセキュリティ要件への対応のため
+mac:
+  target: dmg
+  icon: resources/icon.icns
+  category: public.app-category.productivity
+  artifactName: "${productName}-${version}-${os}-${arch}.${ext}"
+
+dmg:
+  title: "Clipboard Manager"
+  background: resources/dmg-background.png
+  iconSize: 120
+  window:
+    width: 600
+    height: 400
+
+# === Linux設定 ===
+# 何をする部分か：Linux向けのAppImageパッケージ設定
+# なぜ必要か：Linux環境での配布と実行を簡素化するため
+linux:
+  target: AppImage
+  icon: resources/icon.png
+  category: Office
+  artifactName: "${productName}-${version}-${os}-${arch}.${ext}"
+
+# === 自動更新設定 ===
+# 何をする部分か：アプリの自動更新機能設定
+# なぜ必要か：ユーザーが常に最新版を利用できるようにするため
+# (将来の拡張用として設定を準備)
+beforeBuild: null
+afterSign: null
+afterAllArtifactBuild: null

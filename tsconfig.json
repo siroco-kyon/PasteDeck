@@ -1,0 +1,51 @@
+{
+  "compilerOptions": {
+    // === TypeScript基本設定 ===
+    // 何をする部分か：TypeScriptコンパイラーの基本動作を定義
+    // なぜ必要か：型安全性とモダンJavaScriptの活用のため
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    // === モジュール解決設定 ===
+    // 何をする部分か：モジュールのimport/export方式を設定
+    // なぜ必要か：React/Viteとの互換性を保つため
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    // === 型チェック設定 ===
+    // 何をする部分か：厳密な型チェックを有効化
+    // なぜ必要か：バグを未然に防ぎ、コードの品質を向上させるため
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // === パスエイリアス設定 ===
+    // 何をする部分か：インポートパスの短縮記法を定義
+    // なぜ必要か：コードの可読性とメンテナンス性向上のため
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@/shared/*": ["src/shared/*"],
+      "@/renderer/*": ["src/renderer/*"],
+      "@/main/*": ["src/main/*"]
+    }
+  },
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "release"
+  ],
+  "references": [
+    { "path": "./tsconfig.main.json" }
+  ]
+}

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <!-- === 基本メタ情報 === -->
+  <!-- 何をする部分か：ページの言語・文字エンコーディング・ビューポートを設定 -->
+  <!-- なぜ必要か：日本語対応とモバイル表示の最適化のため -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <!-- === ページタイトル === -->
+  <!-- 何をする部分か：アプリケーション名をタイトルバーに表示 -->
+  <!-- なぜ必要か：ユーザーがアプリを識別しやすくするため -->
+  <title>Clipboard Manager - スニペット管理</title>
+  
+  <!-- === ファビコン === -->
+  <!-- 何をする部分か：タブとタスクバーでのアイコン表示 -->
+  <!-- なぜ必要か：アプリの視認性とプロフェッショナルな外観のため -->
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  
+  <!-- === セキュリティポリシー === -->
+  <!-- 何をする部分か：Content Security Policyで外部リソースの読み込みを制限 -->
+  <!-- なぜ必要か：XSS攻撃やコード注入を防止するため -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self' 'unsafe-inline';
+    script-src 'self' 'unsafe-inline' 'unsafe-eval';
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    font-src 'self' https://fonts.gstatic.com;
+    img-src 'self' data: blob:;
+    connect-src 'self' ws://localhost:*;
+  ">
+  
+  <!-- === Roboto フォントの読み込み === -->
+  <!-- 何をする部分か：Material-UIのデフォルトフォントを設定 -->
+  <!-- なぜ必要か：統一されたデザインと読みやすいUI表示のため -->
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap"
+  />
+  
+  <!-- === Material-UI アイコンフォント === -->
+  <!-- 何をする部分か：アイコン表示用のフォントを読み込み -->
+  <!-- なぜ必要か：豊富なアイコンセットを軽量で提供するため -->
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/icon?family=Material+Icons"
+  />
+  
+  <!-- === リセットCSS === -->
+  <!-- 何をする部分か：ブラウザデフォルトのスタイルを正規化 -->
+  <!-- なぜ必要か：クロスブラウザでの一貫した表示を保証するため -->
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html, body, #root {
+      height: 100%;
+      width: 100%;
+      overflow: hidden; /* Electronアプリなのでスクロールを無効化 */
+    }
+    
+    body {
+      font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      /* Electronアプリでのテキスト選択を制御 */
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    
+    /* === テキストフィールドでの選択は許可 === */
+    input, textarea, [contenteditable="true"] {
+      -webkit-user-select: text;
+      -moz-user-select: text;
+      -ms-user-select: text;
+      user-select: text;
+    }
+    
+    /* === スクロールバーのスタイリング（Webkit） === */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background-color: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background-color: rgba(0, 0, 0, 0.3);
+    }
+    
+    /* === ダークモード時のスクロールバー === */
+    @media (prefers-color-scheme: dark) {
+      ::-webkit-scrollbar-thumb {
+        background-color: rgba(255, 255, 255, 0.2);
+      }
+      
+      ::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(255, 255, 255, 0.3);
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- === React マウントポイント === -->
+  <!-- 何をする部分か：ReactアプリケーションがDOM に描画される場所 -->
+  <!-- なぜ必要か：JavaScriptでUIを動的に生成するため -->
+  <div id="root"></div>
+  
+  <!-- === 非対応ブラウザ向けメッセージ === -->
+  <!-- 何をする部分か：JavaScriptが無効な場合の代替表示 -->
+  <!-- なぜ必要か：問題が発生した場合のユーザー案内のため -->
+  <noscript>
+    <div style="
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-family: 'Roboto', sans-serif;
+      color: #666;
+      text-align: center;
+    ">
+      <div>
+        <h2>JavaScript が必要です</h2>
+        <p>このアプリケーションを正常に動作させるには JavaScript を有効にしてください。</p>
+      </div>
+    </div>
+  </noscript>
+  
+  <!-- === React アプリケーション読み込み === -->
+  <!-- 何をする部分か：TypeScript/ReactのメインファイルをVite経由で読み込み -->
+  <!-- なぜ必要か：ビルドされたReactアプリケーションを実行するため -->
+  <script type="module" src="/src/renderer/main.tsx"></script>
+</body>
+</html>
