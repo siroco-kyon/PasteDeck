@@ -1,0 +1,124 @@
+# === Node.js関連 ===
+# 何をする部分か：Node.jsの依存関係とキャッシュファイルを除外
+# なぜ必要か：大きなnode_modulesディレクトリとキャッシュをリポジトリから除外するため
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
+.yarn/
+package-lock.json
+
+# === TypeScript・JavaScript ビルド成果物 ===
+# 何をする部分か：コンパイル済みのJavaScriptファイルを除外
+# なぜ必要か：ソースコードのみを管理し、ビルド成果物は除外するため
+dist/
+build/
+*.js.map
+*.d.ts.map
+
+# === Electron関連 ===
+# 何をする部分か：Electronの配布パッケージと一時ファイルを除外
+# なぜ必要か：大きなバイナリファイルと自動生成ファイルを除外するため
+release/
+out/
+app/
+.electron/
+*.exe
+*.dmg
+*.AppImage
+*.snap
+
+# === データベースファイル ===
+# 何をする部分か：開発時のSQLiteデータベースファイルを除外
+# なぜ必要か：個人の開発データをリポジトリに含めないため
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# === ログファイル ===
+# 何をする部分か：実行時のログファイルを除外
+# なぜ必要か：デバッグ情報や実行ログは開発者固有のため
+logs/
+*.log
+electron-log/
+crash-reports/
+
+# === 環境設定ファイル ===
+# 何をする部分か：環境固有の設定ファイルを除外
+# なぜ必要か：開発者ごとの設定やAPIキーを保護するため
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+config/local.json
+
+# === エディタ・IDE関連 ===
+# 何をする部分か：エディタ固有の設定ファイルを除外
+# なぜ必要か：個人のエディタ設定をリポジトリに含めないため
+.vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# === OS固有ファイル ===
+# 何をする部分か：各OSが自動生成するファイルを除外
+# なぜ必要か：OS固有のメタデータをクリーンに保つため
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# === テスト関連 ===
+# 何をする部分か：テスト実行時の成果物を除外
+# なぜ必要か：テスト結果とカバレッジレポートは一時的なため
+coverage/
+.nyc_output/
+*.lcov
+test-results/
+
+# === キャッシュ・一時ファイル ===
+# 何をする部分か：各種ツールのキャッシュファイルを除外
+# なぜ必要か：キャッシュは再生成可能で容量が大きいため
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# === Vite関連 ===
+# 何をする部分か：Vite開発サーバーの一時ファイルを除外
+# なぜ必要か：開発時のみ必要な一時ファイルのため
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# === 証明書・セキュリティ ===
+# 何をする部分か：コード署名用の証明書ファイルを除外
+# なぜ必要か：セキュリティ上重要な証明書をリポジトリから保護するため
+*.p12
+*.pem
+*.key
+*.cert
+*.crt
+
+# === ユーザーデータ ===
+# 何をする部分か：アプリケーション実行時のユーザーデータを除外
+# なぜ必要か：個人のスニペットデータをリポジトリに含めないため
+userData/
+appData/
+*.snippet
+clipboard-data/
