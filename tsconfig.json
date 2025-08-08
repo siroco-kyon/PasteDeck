@@ -38,14 +38,14 @@
     }
   },
   "include": [
-    "src"
+    "src/renderer/**/*",
+    "src/preload/**/*",
+    "src/shared/**/*"
   ],
   "exclude": [
     "node_modules",
     "dist",
-    "release"
-  ],
-  "references": [
-    { "path": "./tsconfig.main.json" }
+    "release",
+    "src/main/**/*"
   ]
 }

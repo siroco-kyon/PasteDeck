@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "composite": true,
     // === Electron メインプロセス専用設定 ===
     // 何をする部分か：Node.js環境でのTypeScriptコンパイル設定
     // なぜ必要か：Electronメインプロセスは純粋なNode.js環境で動作するため
@@ -12,9 +13,9 @@
     // 何をする部分か：コンパイル後のJavaScriptファイルの出力先を指定
     // なぜ必要か：Electronが実行するメインプロセスファイルを生成するため
     "outDir": "dist/main",
-    "rootDir": "src/main",
+    "rootDir": "src",
     "noEmit": false,
-    "declaration": false,
+    "declaration": true,
     "sourceMap": true,
 
     // === Node.js環境設定 ===

@@ -1,7 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import './types/global';
+// TypeScript global definitions are automatically loaded
+// import './types/global.d'; // Not needed for .d.ts files
 
 // === React アプリケーションエントリーポイント ===
 // 何をする部分か：Reactアプリケーションをブラウザに描画する初期化処理

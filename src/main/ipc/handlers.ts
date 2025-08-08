@@ -158,7 +158,7 @@ function setupSnippetHandlers(): void {
       if (success) {
         showNotification('スニペット削除', 'スニペットを削除しました');
       }
-      return { success, data: success };
+      return { success: true, data: success };
     } catch (error) {
       log.error(`スニペット削除でエラー (ID: ${id}):`, error);
       return { 
@@ -302,7 +302,7 @@ function setupCategoryHandlers(): void {
       if (success) {
         showNotification('カテゴリ削除', 'カテゴリと関連スニペットを削除しました');
       }
-      return { success, data: success };
+      return { success: true, data: success };
     } catch (error) {
       log.error(`カテゴリ削除でエラー (ID: ${id}):`, error);
       return { 

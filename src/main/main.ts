@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, Menu, Tray, nativeImage } from 'electron';
+import { app, BrowserWindow, globalShortcut, Tray } from 'electron';
 import { join } from 'path';
 import log from 'electron-log';
 import { initializeDatabase, closeDatabase } from './db/schema';
@@ -61,7 +61,7 @@ async function createMainWindow(): Promise<BrowserWindow> {
     webPreferences: {
       nodeIntegration: false, // Node.js APIの直接アクセスを無効化
       contextIsolation: true, // レンダラーとメインプロセスの分離
-      enableRemoteModule: false, // remoteモジュールを無効化
+      // remoteモジュールはElectron 14以降では削除済み
       preload: join(__dirname, '../preload/preload.js'), // プリロードスクリプト
       webSecurity: true, // Webセキュリティを有効化
       allowRunningInsecureContent: false, // 非HTTPS コンテンツの実行を禁止
@@ -84,7 +84,7 @@ async function createMainWindow(): Promise<BrowserWindow> {
 
   // ウィンドウを閉じる際の動作（トレイに最小化）
   window.on('close', (event) => {
-    if (app.isQuiting) {
+    if ((app as any).isQuiting) {
       return; // アプリ終了時は通常通り閉じる
     }
     
@@ -243,7 +243,7 @@ app.on('activate', async () => {
 /**
  * アプリケーション終了前の処理
  */
-app.on('before-quit', (event) => {
+app.on('before-quit', (_event) => {
   // === 終了フラグの設定 ===
   // 何をする部分か：通常の終了処理であることをマーク
   // なぜ必要か：ウィンドウクローズ時とアプリ終了時の動作を区別するため

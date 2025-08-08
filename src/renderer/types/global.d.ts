@@ -2,7 +2,7 @@
 // 何をする部分か：レンダラープロセス全体で使用する型定義を提供
 // なぜ必要か：TypeScriptでのコンパイルエラーを防ぎ、型安全性を保つため
 
-import type { ElectronAPI } from '../preload/preload';
+import type { ElectronAPI } from '../../preload/preload';
 
 /**
  * Window オブジェクトの拡張
