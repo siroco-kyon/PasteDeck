@@ -36,7 +36,8 @@
       "Bash(timeout 5s npm run test:startup)",
       "Bash(npm run:*)",
       "Bash(node_modules/.bin/electron-rebuild.cmd)",
-      "Bash(node_modules/.bin/electron-rebuild)"
+      "Bash(node_modules/.bin/electron-rebuild)",
+      "Bash(grep -E \"^\\(sharp|canvas|jimp|png-to-ico|to-ico\\)$\")"
     ],
     "deny": []
   }

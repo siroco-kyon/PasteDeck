@@ -229,8 +229,14 @@ function App() {
   // なぜ必要か：タグから直感的に横断検索できるようにするため
   const handleTagClick = useCallback((tag: string) => {
     setSearchFilters(prev => ({ ...prev, tags: [tag] }));
-    showNotification(`"${tag}" でフィルタリング中 (Escキーで解除)`, 'info');
-  }, [showNotification]);
+  }, []);
+
+  // タグフィルター解除
+  // 何をする部分か：アクティブなタグフィルターをクリア
+  // なぜ必要か：バッジの×ボタンから直接解除できるようにするため
+  const handleClearTagFilter = useCallback(() => {
+    setSearchFilters(prev => ({ ...prev, tags: undefined }));
+  }, []);
 
   // ─────────────────────────────────
   // カテゴリ操作
@@ -338,6 +344,8 @@ function App() {
               onCreateClick={handleOpenCreateSnippet}
               onReorder={handleSnippetReorder}
               onTagClick={handleTagClick}
+              activeTagFilter={searchFilters.tags?.[0]}
+              onClearTagFilter={handleClearTagFilter}
             />
           </Container>
         </Box>

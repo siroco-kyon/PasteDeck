@@ -1,9 +1,10 @@
-import { ipcMain, clipboard, Notification } from 'electron';
+import { ipcMain, clipboard, Notification, globalShortcut } from 'electron';
 import log from 'electron-log';
 import { CategoryOperations, SnippetOperations } from '../db/operations';
 import { JsonCategoryOperations, JsonSnippetOperations } from '../db/jsonStorage';
 import { getDatabase } from '../db/schema';
 import { IPC_CHANNELS } from '../../shared/types';
+import { registerCustomShortcut } from '../shortcuts/shortcutManager';
 import type {
   IPCResponse,
   CreateSnippetInput,
@@ -44,6 +45,7 @@ export function setupIpcHandlers(): void {
     setupAppHandlers();
     setupSettingsHandlers();
     setupDataHandlers();
+    setupShortcutHandlers();
 
     log.info('全てのIPCハンドラーを設定しました');
   } catch (error) {
@@ -640,6 +642,64 @@ async function replacePlaceholders(content: string): Promise<string> {
   });
 
   return result;
+}
+
+/**
+ * ショートカット制御IPCハンドラーの設定
+ * 何をする部分か：レンダラーからショートカットの有効/無効を切り替える
+ * なぜ必要か：設定画面からショートカットをOFFにできるようにするため
+ */
+function setupShortcutHandlers(): void {
+  const { BrowserWindow } = require('electron');
+
+  // === ショートカット有効/無効の切り替え ===
+  ipcMain.handle(
+    IPC_CHANNELS.SHORTCUTS.SET_ENABLED,
+    async (_, type: 'toggle' | 'search', enabled: boolean): Promise<IPCResponse> => {
+      try {
+        const shortcutType = type === 'toggle' ? 'TOGGLE_WINDOW' : 'QUICK_SEARCH';
+        const defaultKey = type === 'toggle' ? 'Ctrl+Shift+V' : 'Ctrl+Shift+Q';
+
+        if (enabled) {
+          // === ショートカット有効化 ===
+          // 何をする部分か：設定されたキーでショートカットを再登録
+          // なぜ必要か：ユーザーが有効に戻した際に即座に反映するため
+          const mainWindow = BrowserWindow.getAllWindows()[0];
+          if (!mainWindow) {
+            return { success: false, message: 'ウィンドウが見つかりません' };
+          }
+          const success = registerCustomShortcut(shortcutType, defaultKey, mainWindow);
+          log.info(`ショートカット有効化: ${defaultKey} → ${success}`);
+          return { success: true, data: { enabled: true, key: defaultKey } };
+        } else {
+          // === ショートカット無効化 ===
+          // 何をする部分か：指定したショートカットキーの登録を解除
+          // なぜ必要か：他のアプリと競合する場合やOFFにしたい場合のため
+          globalShortcut.unregister(defaultKey);
+          log.info(`ショートカット無効化: ${defaultKey}`);
+          return { success: true, data: { enabled: false, key: defaultKey } };
+        }
+      } catch (error) {
+        log.error('ショートカット設定でエラー:', error);
+        return { success: false, message: 'ショートカット設定に失敗しました', details: error };
+      }
+    }
+  );
+
+  // === ショートカット有効状態の取得 ===
+  ipcMain.handle(IPC_CHANNELS.SHORTCUTS.GET_STATUS, async (): Promise<IPCResponse> => {
+    try {
+      return {
+        success: true,
+        data: {
+          toggle: globalShortcut.isRegistered('Ctrl+Shift+V'),
+          search: globalShortcut.isRegistered('Ctrl+Shift+Q'),
+        },
+      };
+    } catch (error) {
+      return { success: false, message: 'ショートカット状態取得に失敗しました', details: error };
+    }
+  });
 }
 
 /**

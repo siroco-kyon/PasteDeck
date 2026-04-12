@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -7,11 +7,14 @@ import {
   Fab,
   Tooltip,
   IconButton,
+  Chip,
 } from '@mui/material';
 import {
   Add as AddIcon,
   ViewModule as GridViewIcon,
   ViewList as ListViewIcon,
+  TrendingUp as TrendingUpIcon,
+  LocalOffer as TagIcon,
 } from '@mui/icons-material';
 import {
   DragDropContext,
@@ -32,11 +35,13 @@ interface SnippetListProps {
   onSnippetSelect: (snippet: Snippet) => void;
   onSnippetEdit: (snippet: Snippet) => void;
   onSnippetDelete: (snippet: Snippet) => void;
-  onSnippetDuplicate: (snippet: Snippet) => void; // 複製
-  onDataChange: () => void; // お気に入り変更等の後のデータ再取得
-  onCreateClick: () => void; // FABボタンで新規作成ダイアログを開く
+  onSnippetDuplicate: (snippet: Snippet) => void;
+  onDataChange: () => void;
+  onCreateClick: () => void;
   onReorder: (items: Array<{ id: number; sortOrder: number }>) => void;
-  onTagClick?: (tag: string) => void; // タグクリックでフィルタリング
+  onTagClick?: (tag: string) => void;
+  activeTagFilter?: string;   // 現在適用中のタグフィルター
+  onClearTagFilter?: () => void; // タグフィルター解除
 }
 
 const SnippetList: React.FC<SnippetListProps> = ({
@@ -50,11 +55,18 @@ const SnippetList: React.FC<SnippetListProps> = ({
   onCreateClick,
   onReorder,
   onTagClick,
+  activeTagFilter,
+  onClearTagFilter,
 }) => {
   // === 表示モード管理 ===
   // 何をする部分か：グリッド表示とDnD対応リスト表示を切り替え
   // なぜ必要か：用途に応じた表示形式とDnD並び替え機能の提供のため
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  // === 使用回数順ソートモード ===
+  // 何をする部分か：よく使う順（useCount降順）への表示切り替えを管理
+  // なぜ必要か：使用頻度の高いスニペットに素早くアクセスできるようにするため
+  const [sortByUsage, setSortByUsage] = useState(false);
 
   // === ローカル並び順状態 ===
   // 何をする部分か：DnD操作中の楽観的更新用にローカルコピーを管理
@@ -99,6 +111,14 @@ const SnippetList: React.FC<SnippetListProps> = ({
     const updates = items.map((item, index) => ({ id: item.id, sortOrder: index }));
     onReorder(updates);
   };
+
+  // === 表示用スニペット（ソート適用） ===
+  // 何をする部分か：よく使う順モード時は useCount 降順に並び替えて表示
+  // なぜ必要か：DnD並び順を壊さずに一時的な使用頻度ソートを提供するため
+  const displaySnippets = useMemo(() => {
+    if (!sortByUsage) return localSnippets;
+    return [...localSnippets].sort((a, b) => b.useCount - a.useCount);
+  }, [localSnippets, sortByUsage]);
 
   // === ローディング表示 ===
   if (loading) {
@@ -148,35 +168,78 @@ const SnippetList: React.FC<SnippetListProps> = ({
 
   return (
     <Box sx={{ position: 'relative', width: '100%', pt: 1 }}>
-      {/* === ヘッダー: 件数 + 表示切り替え === */}
+      {/* === アクティブフィルターバッジ === */}
+      {/* 何をする部分か：タグフィルター適用中であることを明示し、解除ボタンを提供 */}
+      {/* なぜ必要か：フィルタリング中であることをユーザーが把握し、いつでも解除できるようにするため */}
+      {activeTagFilter && (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, px: 1 }}>
+          <TagIcon fontSize="small" sx={{ color: 'primary.main' }} />
+          <Typography variant="caption" color="text.secondary">フィルター中:</Typography>
+          <Chip
+            label={`#${activeTagFilter}`}
+            size="small"
+            color="primary"
+            onDelete={onClearTagFilter}
+            sx={{ fontWeight: 600 }}
+          />
+          <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+            — クリックで解除
+          </Typography>
+        </Box>
+      )}
+
+      {/* === ヘッダー: 件数 + ボタン群 === */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, px: 1 }}>
         <Typography variant="body2" color="text.secondary">
           {localSnippets.length} 件のスニペット
-          {viewMode === 'list' && (
+          {viewMode === 'list' && !sortByUsage && (
             <Typography component="span" variant="caption" color="primary.main" sx={{ ml: 1 }}>
               （ドラッグで並び替え可能）
             </Typography>
           )}
+          {sortByUsage && (
+            <Typography component="span" variant="caption" color="warning.main" sx={{ ml: 1 }}>
+              （使用回数順）
+            </Typography>
+          )}
         </Typography>
 
-        {/* === 表示モード切り替えボタン === */}
-        {/* 何をする部分か：グリッド/リスト表示の切り替えアイコンボタン */}
-        {/* なぜ必要か：リストモードでDnD並び替えを有効にするため */}
-        <Tooltip title={viewMode === 'grid' ? 'リスト表示（並び替え可能）' : 'グリッド表示'}>
-          <IconButton
-            size="small"
-            onClick={() => setViewMode(v => (v === 'grid' ? 'list' : 'grid'))}
-            color={viewMode === 'list' ? 'primary' : 'default'}
-          >
-            {viewMode === 'grid' ? <ListViewIcon /> : <GridViewIcon />}
-          </IconButton>
-        </Tooltip>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          {/* === 使用回数順ソートボタン === */}
+          {/* 何をする部分か：よく使う順トグル */}
+          {/* なぜ必要か：使用頻度の高いスニペットに素早くアクセスするため */}
+          <Tooltip title={sortByUsage ? '通常順に戻す' : 'よく使う順に表示'}>
+            <IconButton
+              size="small"
+              onClick={() => {
+                setSortByUsage(v => !v);
+                if (!sortByUsage) setViewMode('grid'); // ソート時はDnDを無効化
+              }}
+              color={sortByUsage ? 'warning' : 'default'}
+              sx={{ bgcolor: sortByUsage ? 'warning.light' : 'transparent', opacity: sortByUsage ? 1 : 0.7 }}
+            >
+              <TrendingUpIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+
+          {/* === 表示モード切り替えボタン === */}
+          <Tooltip title={viewMode === 'grid' ? 'リスト表示（並び替え可能）' : 'グリッド表示'}>
+            <IconButton
+              size="small"
+              onClick={() => setViewMode(v => (v === 'grid' ? 'list' : 'grid'))}
+              color={viewMode === 'list' ? 'primary' : 'default'}
+              disabled={sortByUsage} // 使用回数順中はDnD無効
+            >
+              {viewMode === 'grid' ? <ListViewIcon /> : <GridViewIcon />}
+            </IconButton>
+          </Tooltip>
+        </Box>
       </Box>
 
       {/* === グリッド表示 === */}
       {viewMode === 'grid' && (
         <Grid container spacing={2}>
-          {localSnippets.map(snippet => (
+          {displaySnippets.map(snippet => (
             <Grid item xs={12} sm={6} md={4} lg={3} key={snippet.id}>
               <SnippetCard
                 snippet={snippet}
@@ -204,7 +267,7 @@ const SnippetList: React.FC<SnippetListProps> = ({
                 {...provided.droppableProps}
                 sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}
               >
-                {localSnippets.map((snippet, index) => (
+                {displaySnippets.map((snippet, index) => (
                   <Draggable
                     key={snippet.id}
                     draggableId={String(snippet.id)}

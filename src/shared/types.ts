@@ -166,6 +166,12 @@ export const IPC_CHANNELS = {
     IMPORT: 'data:import', // JSONファイルからデータをマージ
   },
 
+  // === ショートカット制御 ===
+  SHORTCUTS: {
+    SET_ENABLED: 'shortcuts:set-enabled', // ショートカットの有効/無効切り替え
+    GET_STATUS: 'shortcuts:get-status',   // 現在の有効状態を取得
+  },
+
   // === アプリケーション制御 ===
   APP: {
     SHOW: 'app:show',

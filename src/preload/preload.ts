@@ -73,6 +73,12 @@ interface ElectronAPI {
     quit(): Promise<IPCResponse>;
   };
 
+  // === ショートカット制御API ===
+  shortcuts: {
+    setEnabled(type: 'toggle' | 'search', enabled: boolean): Promise<IPCResponse>;
+    getStatus(): Promise<IPCResponse>;
+  };
+
   // === イベントリスナー ===
   on: {
     quickSearch(callback: () => void): void;
@@ -198,6 +204,18 @@ try {
       },
       async quit() {
         return await ipcRenderer.invoke(IPC_CHANNELS.APP.QUIT);
+      },
+    },
+
+    // === ショートカット制御の公開 ===
+    // 何をする部分か：ショートカットの有効/無効をレンダラーから制御できるようにする
+    // なぜ必要か：設定画面からショートカットをON/OFFするため
+    shortcuts: {
+      async setEnabled(type, enabled) {
+        return await ipcRenderer.invoke(IPC_CHANNELS.SHORTCUTS.SET_ENABLED, type, enabled);
+      },
+      async getStatus() {
+        return await ipcRenderer.invoke(IPC_CHANNELS.SHORTCUTS.GET_STATUS);
       },
     },
 

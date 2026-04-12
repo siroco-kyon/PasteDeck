@@ -64,6 +64,11 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
   const [resetConfirm, setResetConfirm] = useState(false);
   const [dataMessage, setDataMessage] = useState<{ text: string; severity: 'success' | 'error' } | null>(null);
 
+  // === ショートカット有効状態 ===
+  // 何をする部分か：現在のショートカット登録状態をメインプロセスから取得して管理
+  // なぜ必要か：設定画面のトグルをリアルタイムな登録状態と同期するため
+  const [shortcutStatus, setShortcutStatus] = useState({ toggle: true, search: true });
+
   // === ダイアログ開時の設定読み込み ===
   // 何をする部分か：DBから保存済み設定を取得して初期化
   // なぜ必要か：常に最新の設定値を表示するため
@@ -74,9 +79,10 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
       setLoading(true);
       setResetConfirm(false);
       try {
-        const [settingsRes, versionRes] = await Promise.all([
+        const [settingsRes, versionRes, shortcutRes] = await Promise.all([
           window.electronAPI.settings.get(),
           window.electronAPI.app.getVersion(),
+          window.electronAPI.shortcuts.getStatus(),
         ]);
 
         if (settingsRes.success) {
@@ -89,6 +95,9 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
         }
         if (versionRes.success) {
           setVersion(versionRes.data as string);
+        }
+        if (shortcutRes.success) {
+          setShortcutStatus(shortcutRes.data as { toggle: boolean; search: boolean });
         }
       } catch (err) {
         console.error('設定読み込みエラー:', err);
@@ -189,6 +198,20 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
       setDataMessage({ text: 'インポート中にエラーが発生しました', severity: 'error' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  // === ショートカット有効/無効切り替え ===
+  // 何をする部分か：トグル・クイック検索ショートカットの有効状態をメインプロセスに送信
+  // なぜ必要か：他アプリとのキー競合時にユーザーがショートカットを無効化できるようにするため
+  const handleShortcutToggle = async (type: 'toggle' | 'search', enabled: boolean) => {
+    setShortcutStatus(prev => ({ ...prev, [type]: enabled }));
+    try {
+      await window.electronAPI.shortcuts.setEnabled(type, enabled);
+    } catch (err) {
+      console.error('ショートカット設定エラー:', err);
+      // 失敗時は元の状態に戻す
+      setShortcutStatus(prev => ({ ...prev, [type]: !enabled }));
     }
   };
 
@@ -321,20 +344,40 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
               </Box>
               <Stack spacing={1.5}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Typography variant="body2">アプリ表示/非表示</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Switch
+                      size="small"
+                      checked={shortcutStatus.toggle}
+                      onChange={e => handleShortcutToggle('toggle', e.target.checked)}
+                    />
+                    <Typography variant="body2" color={shortcutStatus.toggle ? 'text.primary' : 'text.disabled'}>
+                      アプリ表示/非表示
+                    </Typography>
+                  </Box>
                   <Chip
                     label={settings?.globalShortcut || 'Ctrl+Shift+V'}
                     size="small"
                     variant="outlined"
+                    disabled={!shortcutStatus.toggle}
                     sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}
                   />
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Typography variant="body2">クイック検索</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Switch
+                      size="small"
+                      checked={shortcutStatus.search}
+                      onChange={e => handleShortcutToggle('search', e.target.checked)}
+                    />
+                    <Typography variant="body2" color={shortcutStatus.search ? 'text.primary' : 'text.disabled'}>
+                      クイック検索
+                    </Typography>
+                  </Box>
                   <Chip
                     label={settings?.quickSearchShortcut || 'Ctrl+Shift+Q'}
                     size="small"
                     variant="outlined"
+                    disabled={!shortcutStatus.search}
                     sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}
                   />
                 </Box>
