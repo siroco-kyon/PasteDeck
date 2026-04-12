@@ -2,6 +2,7 @@ import { app, BrowserWindow, globalShortcut, Tray } from 'electron';
 import { join } from 'path';
 import log from 'electron-log';
 import { initializeDatabase, closeDatabase } from './db/schema';
+import { initializeJsonStorage } from './db/jsonStorage';
 import { setupIpcHandlers } from './ipc/handlers';
 import { createTray } from './tray/trayManager';
 import { setupGlobalShortcuts } from './shortcuts/shortcutManager';
@@ -26,7 +27,7 @@ let tray: Tray | null = null;
  * 開発環境判定フラグ
  * ビルドモードに応じてリソースパスを切り替え
  */
-const isDev = process.env.NODE_ENV === 'development';
+const isDev = !app.isPackaged;
 
 /**
  * メインウィンドウ作成
@@ -129,12 +130,24 @@ async function createMainWindow(): Promise<BrowserWindow> {
  */
 async function initializeApp(): Promise<void> {
   try {
-    log.info('アプリケーションを初期化中...');
+    log.info(`アプリケーションを初期化中... (開発モード: ${isDev})`);
 
     // === データベース初期化 ===
     // 何をする部分か：SQLiteデータベースのセットアップ
     // なぜ必要か：スニペットデータの永続化基盤を準備するため
-    await initializeDatabase();
+    try {
+      await initializeDatabase();
+      log.info('データベース初期化が成功しました');
+    } catch (error) {
+      log.error('SQLiteデータベース初期化でエラーが発生、JSONストレージに切り替えます:', error);
+      try {
+        await initializeJsonStorage();
+        log.info('JSONストレージで初期化が成功しました');
+      } catch (jsonError) {
+        log.error('JSONストレージ初期化でもエラーが発生:', jsonError);
+        throw new Error('すべてのストレージ方式で初期化に失敗しました');
+      }
+    }
 
     // === IPC ハンドラー設定 ===
     // 何をする部分か：レンダラープロセスとの通信チャンネル確立

@@ -8,7 +8,6 @@ import {
   Box,
   Tooltip,
   Chip,
-  Badge,
 } from '@mui/material';
 import {
   ContentCopy as CopyIcon,
@@ -19,6 +18,10 @@ import {
   Code as CodeIcon,
   Web as HtmlIcon,
   Image as ImageIcon,
+  DragIndicator as DragIcon,
+  FileCopy as DuplicateIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import type { Snippet } from '@/shared/types';
 
@@ -28,23 +31,34 @@ import type { Snippet } from '@/shared/types';
 
 interface SnippetCardProps {
   snippet: Snippet;
-  onSelect: () => void;
-  onUpdate: () => void;
-  onDelete: () => void;
-  onFavoriteToggle: () => void;
+  onSelect: () => void;              // クリップボードコピー（親で実装）
+  onEdit: () => void;                // 編集ダイアログを開く（親で実装）
+  onDelete: () => void;              // 削除意図を通知（確認は親で実装）
+  onDuplicate: () => void;           // 複製（親で実装）
+  onFavoriteToggle: () => void;      // お気に入り変更後のデータ再取得
+  onTagClick?: (tag: string) => void; // タグクリックでフィルタリング
+  dragHandleProps?: React.HTMLAttributes<HTMLDivElement>; // DnD用ドラッグハンドル
+  isDragging?: boolean;              // DnD中のスタイル制御
 }
 
 const SnippetCard: React.FC<SnippetCardProps> = ({
   snippet,
   onSelect,
-  onUpdate,
+  onEdit,
   onDelete,
+  onDuplicate,
   onFavoriteToggle,
+  onTagClick,
+  dragHandleProps,
+  isDragging,
 }) => {
-  // === 状態管理 ===
-  // 何をする部分か：カード操作の状態を管理
-  // なぜ必要か：操作中の視覚的フィードバックを提供するため
   const [isHovered, setIsHovered] = useState(false);
+
+  // === コンテンツ展開状態 ===
+  // 何をする部分か：長いコンテンツの展開/折りたたみ状態を管理
+  // なぜ必要か：詳細を確認したい場合はコピー前に展開できるようにするため
+  const [expanded, setExpanded] = useState(false);
+  const isLongContent = snippet.content.length > 120;
 
   // === コンテンツタイプ別アイコン取得 ===
   // 何をする部分か：スニペットの種類に応じたアイコンを表示
@@ -55,33 +69,20 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
         return <HtmlIcon fontSize="small" color="secondary" />;
       case 'image':
         return <ImageIcon fontSize="small" color="success" />;
-      case 'text':
       default:
         return <CodeIcon fontSize="small" color="primary" />;
     }
   };
 
-  // === コンテンツプレビュー生成 ===
-  // 何をする部分か：スニペット内容の短縮版を表示用に生成
-  // なぜ必要か：カード内で内容を把握できるようにするため
-  const getPreviewText = (content: string, maxLength: number = 100): string => {
-    if (content.length <= maxLength) {
-      return content;
-    }
-    return content.substring(0, maxLength) + '...';
-  };
-
   // === お気に入り切り替え処理 ===
-  // 何をする部分か：スニペットのお気に入り状態を切り替え
-  // なぜ必要か：頻繁に使用するスニペットをマークするため
+  // 何をする部分か：IPC経由でお気に入り状態を更新しコールバックで親に通知
+  // なぜ必要か：確認不要の操作なのでカード内で完結させるため
   const handleFavoriteToggle = async (event: React.MouseEvent) => {
-    event.stopPropagation(); // カード選択イベントの発生を防ぐ
-    
+    event.stopPropagation();
     try {
       const response = await window.electronAPI.snippet.update(snippet.id, {
         isFavorite: !snippet.isFavorite,
       });
-      
       if (response.success) {
         onFavoriteToggle();
       }
@@ -90,45 +91,44 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
     }
   };
 
-  // === 編集処理 ===
-  // 何をする部分か：スニペット編集画面への遷移（将来実装）
-  // なぜ必要か：スニペット内容の変更を可能にするため
   const handleEdit = (event: React.MouseEvent) => {
     event.stopPropagation();
-    // TODO: 編集ダイアログの実装
-    console.log('編集機能は準備中です');
-    onUpdate();
+    onEdit();
   };
 
-  // === 削除処理 ===
-  // 何をする部分か：スニペットの削除実行
-  // なぜ必要か：不要になったスニペットを管理するため
-  const handleDelete = async (event: React.MouseEvent) => {
+  const handleDelete = (event: React.MouseEvent) => {
     event.stopPropagation();
-    
-    // === 削除確認 ===
-    // 何をする部分か：誤削除を防ぐための確認ダイアログ
-    // なぜ必要か：重要なデータの意図しない削除を防ぐため
-    const confirmed = confirm(`"${snippet.title}" を削除しますか？\nこの操作は取り消せません。`);
-    
-    if (!confirmed) return;
-    
-    try {
-      const response = await window.electronAPI.snippet.delete(snippet.id);
-      
-      if (response.success) {
-        onDelete();
-      }
-    } catch (error) {
-      console.error('削除エラー:', error);
-    }
+    onDelete();
   };
 
-  // === カードクリック処理 ===
-  // 何をする部分か：スニペット選択（コピー実行）
-  // なぜ必要か：メイン機能であるクリップボードコピーを簡単に実行するため
-  const handleCardClick = () => {
-    onSelect(); // 親コンポーネントでコピー処理を実行
+  const handleDuplicate = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    onDuplicate();
+  };
+
+  // === コンテンツ展開トグル ===
+  // 何をする部分か：カード全体のクリック（コピー）と分離して展開のみ実行
+  // なぜ必要か：コピーせずに内容確認だけしたい場合に対応するため
+  const handleExpandToggle = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    setExpanded(v => !v);
+  };
+
+  // === タグクリック処理 ===
+  // 何をする部分か：タグChipクリック時にそのタグでフィルタリング
+  // なぜ必要か：タグから直感的に絞り込みをかけられるようにするため
+  const handleTagClick = (event: React.MouseEvent, tag: string) => {
+    event.stopPropagation();
+    onTagClick?.(tag);
+  };
+
+  // === 使用回数の視覚的表現 ===
+  // 何をする部分か：使用回数に応じて色を変えて頻繁に使うスニペットを強調
+  // なぜ必要か：よく使うスニペットを一目で判別できるようにするため
+  const getUseCountColor = () => {
+    if (snippet.useCount >= 10) return 'warning.main';
+    if (snippet.useCount > 0) return 'primary.main';
+    return 'text.disabled';
   };
 
   return (
@@ -142,26 +142,50 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
         position: 'relative',
         border: snippet.isFavorite ? '2px solid' : '1px solid',
         borderColor: snippet.isFavorite ? 'secondary.main' : 'divider',
+        opacity: isDragging ? 0.85 : 1,
+        boxShadow: isDragging ? 8 : undefined,
         '&:hover': {
-          transform: 'translateY(-2px)',
-          boxShadow: 4,
+          transform: isDragging ? 'none' : 'translateY(-2px)',
+          boxShadow: isDragging ? 8 : 4,
           borderColor: snippet.isFavorite ? 'secondary.main' : 'primary.main',
         },
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onClick={handleCardClick}
+      onClick={onSelect}
     >
-      {/* === カードヘッダー === */}
-      <CardContent sx={{ flexGrow: 1, pb: 1 }}>
+      {/* === ドラッグハンドル（リストビュー時のみ表示） === */}
+      {/* 何をする部分か：DnD並び替え用のハンドルを左端に表示 */}
+      {/* なぜ必要か：カード全体のクリック操作とDnDを競合させないため */}
+      {dragHandleProps && (
+        <Box
+          {...dragHandleProps}
+          onClick={e => e.stopPropagation()}
+          sx={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 24,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'grab',
+            color: 'text.disabled',
+            '&:hover': { color: 'text.secondary' },
+            '&:active': { cursor: 'grabbing' },
+          }}
+        >
+          <DragIcon fontSize="small" />
+        </Box>
+      )}
+
+      <CardContent sx={{ flexGrow: 1, pb: 1, pl: dragHandleProps ? 4 : 2 }}>
         {/* === タイトル行 === */}
         <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1 }}>
-          {/* コンテンツタイプアイコン */}
-          <Box sx={{ mr: 1, mt: 0.5 }}>
+          <Box sx={{ mr: 1, mt: 0.5, flexShrink: 0 }}>
             {getContentTypeIcon()}
           </Box>
-          
-          {/* スニペットタイトル */}
           <Typography
             variant="subtitle1"
             component="h3"
@@ -178,54 +202,81 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
           >
             {snippet.title}
           </Typography>
-          
-          {/* === お気に入りアイコン === */}
           {snippet.isFavorite && (
-            <StarIcon
-              fontSize="small"
-              color="secondary"
-              sx={{ ml: 1, flexShrink: 0 }}
-            />
+            <StarIcon fontSize="small" color="secondary" sx={{ ml: 1, flexShrink: 0 }} />
           )}
         </Box>
 
-        {/* === コンテンツプレビュー === */}
-        {/* 何をする部分か：スニペット内容の短縮表示 */}
+        {/* === コンテンツプレビュー（展開/折りたたみ対応） === */}
+        {/* 何をする部分か：デフォルト3行、展開時は全文を表示 */}
+        {/* なぜ必要か：長いスニペットの内容確認をコピーなしで行えるようにするため */}
         <Typography
           variant="body2"
           color="text.secondary"
           sx={{
-            mb: 2,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            display: '-webkit-box',
-            WebkitLineClamp: 3,
-            WebkitBoxOrient: 'vertical',
-            minHeight: '3.6em',
+            mb: isLongContent ? 0.5 : 1.5,
             fontFamily: 'monospace',
             fontSize: '0.75rem',
             backgroundColor: 'action.hover',
             padding: 1,
             borderRadius: 1,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-all',
+            ...(!expanded && {
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: '-webkit-box',
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical',
+              minHeight: '3.6em',
+            }),
           }}
         >
-          {getPreviewText(snippet.content)}
+          {snippet.content}
         </Typography>
 
-        {/* === タグ表示 === */}
-        {/* 何をする部分か：スニペットに付けられたタグの表示 */}
-        {/* なぜ必要か：分類情報の視覚的表示と検索の手がかり提供のため */}
+        {/* === 展開/折りたたみボタン === */}
+        {isLongContent && (
+          <Box sx={{ textAlign: 'right', mb: 1 }}>
+            <Typography
+              component="span"
+              variant="caption"
+              color="primary.main"
+              onClick={handleExpandToggle}
+              sx={{
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.25,
+                '&:hover': { textDecoration: 'underline' },
+              }}
+            >
+              {expanded ? (
+                <><ExpandLessIcon sx={{ fontSize: 14 }} />閉じる</>
+              ) : (
+                <><ExpandMoreIcon sx={{ fontSize: 14 }} />もっと見る</>
+              )}
+            </Typography>
+          </Box>
+        )}
+
+        {/* === タグ表示（クリックでフィルタリング） === */}
+        {/* 何をする部分か：タグChipをクリックするとそのタグで絞り込みが発動 */}
+        {/* なぜ必要か：タグベースの素早いフィルタリングを可能にするため */}
         {snippet.tags.length > 0 && (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
-            {snippet.tags.slice(0, 3).map((tag) => (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            {snippet.tags.slice(0, 3).map(tag => (
               <Chip
                 key={tag}
                 label={tag}
                 size="small"
                 variant="outlined"
+                onClick={onTagClick ? e => handleTagClick(e, tag) : undefined}
                 sx={{
                   fontSize: '0.7rem',
                   height: 20,
+                  cursor: onTagClick ? 'pointer' : 'default',
+                  '&:hover': onTagClick ? { bgcolor: 'primary.light', borderColor: 'primary.main' } : {},
                 }}
               />
             ))}
@@ -234,39 +285,37 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
                 label={`+${snippet.tags.length - 3}`}
                 size="small"
                 variant="outlined"
-                sx={{
-                  fontSize: '0.7rem',
-                  height: 20,
-                  opacity: 0.7,
-                }}
+                sx={{ fontSize: '0.7rem', height: 20, opacity: 0.7 }}
               />
             )}
           </Box>
         )}
       </CardContent>
 
-      {/* === カードフッター（操作ボタン群） === */}
-      <CardActions sx={{ px: 2, pb: 2, pt: 0, justifyContent: 'space-between' }}>
-        {/* === 使用統計表示 === */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="caption" color="text.secondary">
-            使用: {snippet.useCount}回
+      {/* === フッター操作ボタン群 === */}
+      <CardActions sx={{ px: 2, pb: 1.5, pt: 0, justifyContent: 'space-between' }}>
+        {/* === 使用回数表示（頻度により色分け） === */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          {snippet.useCount > 0 && (
+            <Box
+              sx={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                bgcolor: getUseCountColor(),
+                flexShrink: 0,
+              }}
+            />
+          )}
+          <Typography variant="caption" color={getUseCountColor()}>
+            {snippet.useCount > 0 ? `${snippet.useCount}回使用` : '未使用'}
           </Typography>
         </Box>
 
-        {/* === 操作ボタン群 === */}
-        {/* 何をする部分か：ホバー時に表示される操作ボタン */}
-        {/* なぜ必要か：カードを見やすく保ちながら必要時に操作を提供するため */}
-        <Box
-          sx={{
-            display: 'flex',
-            opacity: isHovered ? 1 : 0.5,
-            transition: 'opacity 0.2s',
-          }}
-        >
+        <Box sx={{ display: 'flex', opacity: isHovered ? 1 : 0.4, transition: 'opacity 0.2s' }}>
           {/* コピーボタン */}
           <Tooltip title="クリップボードにコピー">
-            <IconButton size="small" onClick={handleCardClick}>
+            <IconButton size="small" onClick={e => { e.stopPropagation(); onSelect(); }}>
               <CopyIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -278,7 +327,18 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
               onClick={handleFavoriteToggle}
               color={snippet.isFavorite ? 'secondary' : 'default'}
             >
-              {snippet.isFavorite ? <StarIcon fontSize="small" /> : <StarBorderIcon fontSize="small" />}
+              {snippet.isFavorite
+                ? <StarIcon fontSize="small" />
+                : <StarBorderIcon fontSize="small" />}
+            </IconButton>
+          </Tooltip>
+
+          {/* 複製ボタン */}
+          {/* 何をする部分か：このスニペットのコピーを "(コピー)" 付きタイトルで作成 */}
+          {/* なぜ必要か：似たスニペットをゼロから作る手間を省くため */}
+          <Tooltip title="複製">
+            <IconButton size="small" onClick={handleDuplicate}>
+              <DuplicateIcon fontSize="small" />
             </IconButton>
           </Tooltip>
 

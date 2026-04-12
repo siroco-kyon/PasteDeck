@@ -8,7 +8,7 @@ import type {
   CreateCategoryInput,
   UpdateCategoryInput,
   SearchFilters,
-} from '@/shared/types';
+} from '../../shared/types';
 
 // === データベース操作関数群 ===
 // 何をする部分か：スニペット・カテゴリのCRUD操作を提供

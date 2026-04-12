@@ -139,6 +139,8 @@ export const IPC_CHANNELS = {
     SEARCH: 'snippet:search',
     COPY_TO_CLIPBOARD: 'snippet:copy-to-clipboard',
     INCREMENT_USE_COUNT: 'snippet:increment-use-count',
+    REORDER: 'snippet:reorder', // 並び替え（sort_order一括更新）
+    DUPLICATE: 'snippet:duplicate', // 複製（コピーを新規作成）
   },
   
   // === カテゴリ関連 ===
@@ -158,6 +160,12 @@ export const IPC_CHANNELS = {
     RESET: 'settings:reset',
   },
   
+  // === データ管理（インポート/エクスポート）===
+  DATA: {
+    EXPORT: 'data:export', // 全データをJSONファイルに書き出し
+    IMPORT: 'data:import', // JSONファイルからデータをマージ
+  },
+
   // === アプリケーション制御 ===
   APP: {
     SHOW: 'app:show',

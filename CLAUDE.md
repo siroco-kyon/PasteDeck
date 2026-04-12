@@ -1,171 +1,112 @@
 # CLAUDE.md
 必ず日本語で回答してください。
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Development Commands
 
-### Core Development Workflow
 ```bash
-# Start development environment (concurrent processes)
-npm run dev                    # Starts both Vite dev server and Electron
+# Start full development environment (Vite dev server + Electron)
+npm run dev
 
-# Individual process development
-npm run dev:vite              # Start React dev server only (port 3000)
-npm run dev:electron          # Compile main process and start Electron
+# Individual process debugging
+npm run dev:vite              # React dev server only (port 3000)
+npm run dev:electron          # Compile main+preload, then start Electron
 
-# TypeScript compilation (dual contexts)
-npx tsc -p tsconfig.main.json     # Compile main process (Node.js/Electron)
-npx tsc --noEmit                   # Type check renderer process (React/Vite)
+# TypeScript type checking
+npx tsc -p tsconfig.main.json     # Compile main process
+npx tsc --noEmit                   # Type check renderer (no output)
 
 # Production builds
-npm run build                 # Full build (renderer + main)
-npm run build:renderer        # Build React app only
-npm run build:main           # Compile Electron main process only
+npm run build                 # Full build (renderer + main + preload)
+npm run build:main            # Compile main process only → dist/main/
+npm run build:preload         # Compile preload script → dist/preload/
+npm run build:renderer        # Build React app → dist/renderer/
 
-# Platform-specific distributions
-npm run build:win            # Windows installer
-npm run build:mac            # macOS DMG
-npm run build:linux          # Linux AppImage
+# Distribution packages
+npm run build:win             # Windows NSIS installer → release/
+npm run build:mac             # macOS DMG → release/
+npm run build:linux           # Linux AppImage → release/
+
+# Quality checks
+npm run lint                  # ESLint (max-warnings 0)
+npm test                      # Vitest unit tests
+
+# Startup smoke test (auto-exits after 3 seconds)
+npm run test:startup
 ```
 
-### Debugging & Troubleshooting
+### Troubleshooting Native Modules (Windows/WSL)
 ```bash
-# Common dependency issues (especially in WSL/Windows)
+# better-sqlite3 compatibility issues
+npx electron-rebuild
+
+# Full dependency reset
 rm -rf node_modules package-lock.json && npm install
-
-# Force install missing native binaries
-npm install @rollup/rollup-linux-x64-gnu --save-dev --force
-
-# Alternative package manager (more reliable in WSL)
-yarn install && yarn dev
 ```
 
 ## Architecture Overview
 
 ### Electron Multi-Process Architecture
-This app follows Electron's secure architecture with **context isolation enabled**:
+This app uses Electron's secure architecture with **context isolation enabled**:
 
-- **Main Process** (`src/main/`): Node.js environment managing app lifecycle, system APIs, database, IPC handlers
-- **Preload Script** (`src/preload/`): Secure bridge exposing limited APIs to renderer via `contextBridge`  
-- **Renderer Process** (`src/renderer/`): React app running in Chromium with restricted access
+- **Main Process** (`src/main/`): Node.js — app lifecycle, database, IPC handlers, tray, shortcuts
+- **Preload Script** (`src/preload/preload.ts`): Compiled separately (inline `tsc` command, not via tsconfig). Bridges main ↔ renderer via `contextBridge`, exposing `window.electronAPI.*`
+- **Renderer Process** (`src/renderer/`): React app with no Node.js access
 
-**Critical**: Main and renderer processes have separate TypeScript configurations and compilation contexts.
+**Critical**: Main and renderer have separate TypeScript configurations. The preload has no dedicated tsconfig — it uses an inline `tsc` invocation in `npm run build:preload`.
 
 ### Dual TypeScript Compilation
-The project uses **two separate TypeScript configurations**:
-
-1. **`tsconfig.main.json`**: Node.js environment (CommonJS, composite project)
-   - Compiles to `dist/main/` 
+1. **`tsconfig.main.json`**: CommonJS, Node.js environment → `dist/main/`
    - Includes `src/main/**/*` and `src/shared/**/*`
-   - Uses `@/shared/*` path alias for type sharing
 
-2. **`tsconfig.json`**: Browser environment (ESModules, Vite bundling)
-   - Renderer process only, excludes main process files
-   - Uses path aliases: `@/*`, `@/shared/*`, `@/renderer/*`
+2. **`tsconfig.json`**: ESModules, Vite/browser environment → `dist/renderer/`
+   - Excludes main process files
+   - Path aliases: `@/*`, `@/shared/*`, `@/renderer/*`
 
-### Secure IPC Communication Pattern
-All communication uses typed IPC channels defined in `src/shared/types.ts`:
+`src/shared/types.ts` is the single source of truth for types shared across both contexts.
 
-```typescript
-// Channel naming convention
-export const IPC_CHANNELS = {
-  SNIPPET: { GET_ALL: 'snippet:get-all', CREATE: 'snippet:create' },
-  // ...
-}
+### Storage Architecture (SQLite with JSON Fallback)
+The app uses **Better SQLite3** as primary storage, with automatic fallback to a JSON file if SQLite fails (common on WSL/Windows due to native binary issues):
 
-// Unified response types
-export type IPCResponse<T> = SuccessResponse<T> | ErrorResponse
-```
+- **SQLite primary**: `src/main/db/schema.ts` (init) + `src/main/db/operations.ts` (CRUD)
+- **JSON fallback**: `src/main/db/jsonStorage.ts` — async file-based storage at `userData/clipboard-manager-data.json`
+- **Fallback trigger**: `src/main/main.ts` `initializeApp()` catches SQLite init errors and calls `initializeJsonStorage()`
+- **Handler fallback**: IPC handlers in `src/main/ipc/handlers.ts` also have per-call try/catch that falls back to `JsonOperations`
 
-**Key Pattern**: 
-- Main process handlers in `src/main/ipc/handlers.ts` handle all business logic
-- Preload script exposes type-safe wrapper functions
-- Renderer uses `window.electronAPI.*` for all Electron functionality
+SQLite schema tables: `categories`, `snippets`, `settings`. Tags stored as JSON strings. Auto-timestamps via triggers, foreign keys enabled.
 
-### Database Layer Architecture
-Uses **Better SQLite3** with operation abstraction:
+### IPC Communication Pattern
+All channels are typed constants in `src/shared/types.ts` → `IPC_CHANNELS`. All responses use `IPCResponse<T> = SuccessResponse<T> | ErrorResponse`.
 
-- **Schema** (`src/main/db/schema.ts`): Database initialization, table creation, sample data
-- **Operations** (`src/main/db/operations.ts`): Type-safe CRUD operations using shared types
-- **Auto-migration**: Database and tables created automatically on first run
+Data flow: `React Components` → `Custom Hooks` → `window.electronAPI.*` → `Preload` → `ipcRenderer.invoke` → `ipcMain.handle` → `DB Operations`
 
-Data flow: `React Components` → `Custom Hooks` → `IPC` → `DB Operations` → `SQLite`
+### State Management (Renderer)
+Custom hooks in `src/renderer/hooks/`:
+- `useCategories()` — Category CRUD with optimistic updates
+- `useSnippets(filters)` — Snippet management with real-time search
+- `useTheme()` — Dark/light mode following system preference
+- `useElectronEvents()` — Global shortcut and system event handling
 
-### State Management Pattern
-React app uses **hooks-based architecture** with custom hooks for:
-
-- `useCategories()`: Category CRUD with optimistic updates
-- `useSnippets(filters)`: Snippet management with real-time search  
-- `useTheme()`: Dark/light mode with system preference detection
-- `useElectronEvents()`: Global shortcut and system event handling
-
-## Critical Development Context
-
-### Path Aliases & Module Resolution
-Different resolution contexts require careful import handling:
-
-```typescript
-// In main process (Node.js style)
-import type { Snippet } from '@/shared/types'
-
-// In renderer process (Vite/ESM style)  
-import type { Snippet } from '@/shared/types'
-```
-
-**Important**: Shared types in `src/shared/types.ts` must be accessible to both contexts with different path resolution.
-
-### Japanese Documentation Requirements
-All code must include comprehensive Japanese comments explaining:
+## Japanese Documentation Requirements
+All code must include Japanese comments explaining:
 - **何をする部分か** (What this part does)
 - **なぜ必要か** (Why this is needed)
 
-This is not optional - it's a core requirement for maintainability.
-
-### Global Shortcuts & System Integration
-The app provides global system access via:
-
-- **Shortcuts**: `Ctrl+Shift+V` (toggle), `Ctrl+Shift+Q` (quick search)
-- **System Tray**: Dynamic menu with recent snippets, context actions
-- **Clipboard Integration**: Placeholder replacement system (`{date}`, `{time}`, etc.)
-
-Implementation spans: `shortcuts/shortcutManager.ts`, `tray/trayManager.ts`, `ipc/handlers.ts`
-
-### Security & Electron Best Practices
-This app implements secure Electron patterns:
-
-- `nodeIntegration: false` - No Node.js in renderer
-- `contextIsolation: true` - Isolated contexts
-- `webSecurity: true` - Standard web security
-- IPC input validation on all channels
-- CSP headers in index.html
-
-**Never** bypass these security measures or enable `nodeIntegration`.
+This is a core project requirement, not optional.
 
 ## Important Technical Details
 
-### Placeholder Replacement System
-Dynamic content replacement in snippets:
-- Implementation: `src/main/ipc/handlers.ts` → `replacePlaceholders()`
-- Supported: `{date}`, `{time}`, `{datetime}`, `{username}`, `{clipboard}`
-- Execution: On copy-to-clipboard, not on storage
+### Placeholder Replacement
+Executed at copy-to-clipboard time (not at storage time) in `src/main/ipc/handlers.ts` → `replacePlaceholders()`. Supported: `{date}`, `{time}`, `{datetime}`, `{username}`, `{clipboard}`.
 
-### Material-UI Integration
-Theme system supports:
-- Auto dark/light mode detection
-- System preference following  
-- Custom color schemes per category
-- Responsive breakpoints for snippet cards
-
-### SQLite Schema & Operations
-Database design:
-- **categories**: Base organization with sort_order, custom colors/icons
-- **snippets**: Content with usage statistics, tags as JSON strings
-- **settings**: Key-value store for app preferences
-- Auto-timestamps via triggers, foreign key constraints enabled
+### Security Constraints
+- `nodeIntegration: false`, `contextIsolation: true`, `webSecurity: true`
+- IPC input validation on all channels
+- **Never** bypass these settings or enable `nodeIntegration`
 
 ### Development Workflow Notes
-1. **Always run `npm run dev`** - don't start processes individually unless debugging
-2. **Main process changes require restart** - Electron doesn't hot-reload main process
-3. **Renderer changes auto-reload** - Thanks to Vite HMR
-4. **Database changes**: Delete app data folder to reset during development
-5. **Path alias issues**: Check both tsconfig files if imports fail
+- **Main process changes require Electron restart** — no hot-reload for main/preload
+- **Renderer changes auto-reload** via Vite HMR
+- **Reset database**: delete `%APPDATA%/clipboard-manager/` (Windows) or `~/.config/clipboard-manager/` (Linux)
+- **Logs**: `%APPDATA%/clipboard-manager/logs/` (Windows) or `~/.config/clipboard-manager/logs/` (Linux)

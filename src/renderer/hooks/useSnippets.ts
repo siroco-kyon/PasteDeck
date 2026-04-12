@@ -37,6 +37,11 @@ export function useSnippets(filters: SearchFilters = {}): UseSnippetsReturn {
       setLoading(true);
       setError(null);
 
+      // Electron APIの利用可能性をチェック
+      if (!window.electronAPI || !window.electronAPI.snippet) {
+        throw new Error('Electron APIが利用できません');
+      }
+
       let response;
       
       // === 検索条件の有無による分岐 ===

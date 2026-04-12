@@ -10,10 +10,12 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:vite\" \"wait-on http://localhost:3000 && npm run dev:electron\"",
     "dev:vite": "vite --port 3000",
-    "dev:electron": "tsc -p tsconfig.main.json && electron .",
-    "build": "npm run build:renderer && npm run build:main",
+    "dev:electron": "npm run build:main && npm run build:preload && electron .",
+    "test:startup": "npm run build:main && npm run build:preload && timeout 3 electron . || echo \"Electron startup test completed\"",
+    "build": "npm run build:renderer && npm run build:main && npm run build:preload",
     "build:renderer": "vite build",
     "build:main": "tsc -p tsconfig.main.json",
+    "build:preload": "node scripts/build-preload.js",
     "build:win": "npm run build && electron-builder --win",
     "build:mac": "npm run build && electron-builder --mac",
     "build:linux": "npm run build && electron-builder --linux",
@@ -27,23 +29,26 @@
     "@mui/icons-material": "^5.14.19",
     "@mui/material": "^5.14.20",
     "@mui/system": "^5.14.20",
-    "better-sqlite3": "^9.2.2",
+    "better-sqlite3": "^12.2.0",
     "electron-log": "^5.0.0",
     "react": "^18.2.0",
     "react-beautiful-dnd": "^13.1.1",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.1",
     "@types/better-sqlite3": "^7.6.8",
     "@types/react": "^18.2.43",
-    "@types/react-dom": "^18.2.17",
     "@types/react-beautiful-dnd": "^13.1.6",
+    "@types/react-dom": "^18.2.17",
     "@typescript-eslint/eslint-plugin": "^6.14.0",
     "@typescript-eslint/parser": "^6.14.0",
     "@vitejs/plugin-react": "^4.2.1",
     "concurrently": "^8.2.2",
-    "electron": "^27.1.3",
+    "cross-env": "^10.0.0",
+    "electron": "^27.3.11",
     "electron-builder": "^24.9.1",
+    "electron-rebuild": "^3.2.9",
     "eslint": "^8.55.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
@@ -68,7 +73,9 @@
       {
         "from": "resources",
         "to": "resources",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {

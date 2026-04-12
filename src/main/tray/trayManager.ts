@@ -2,6 +2,7 @@ import { Tray, Menu, BrowserWindow, app, nativeImage } from 'electron';
 import { join } from 'path';
 import log from 'electron-log';
 import { SnippetOperations } from '../db/operations';
+import { JsonSnippetOperations } from '../db/jsonStorage';
 
 // === システムトレイ管理 ===
 // 何をする部分か：バックグラウンド動作時のユーザーインターフェースを提供
@@ -127,8 +128,12 @@ async function setupTrayMenu(tray: Tray, mainWindow: BrowserWindow): Promise<voi
           label: truncateText(snippet.title, 30),
           click: async () => {
             await copySnippetToClipboard(snippet.id, snippet.content);
-            // 使用統計の更新
-            await SnippetOperations.incrementUseCount(snippet.id);
+            // 使用統計の更新（エラー時は無視）
+            try {
+              await SnippetOperations.incrementUseCount(snippet.id);
+            } catch (error) {
+              log.warn('使用統計更新をスキップ:', String(error));
+            }
           },
         })),
       });
@@ -142,7 +147,11 @@ async function setupTrayMenu(tray: Tray, mainWindow: BrowserWindow): Promise<voi
           label: `${truncateText(snippet.title, 25)} (${snippet.useCount}回)`,
           click: async () => {
             await copySnippetToClipboard(snippet.id, snippet.content);
-            await SnippetOperations.incrementUseCount(snippet.id);
+            try {
+              await SnippetOperations.incrementUseCount(snippet.id);
+            } catch (error) {
+              log.warn('使用統計更新をスキップ:', String(error));
+            }
           },
         })),
       });
@@ -252,7 +261,14 @@ function setupTrayMenuUpdater(tray: Tray, mainWindow: BrowserWindow): void {
  */
 async function getRecentSnippets(limit: number) {
   try {
-    const allSnippets = await SnippetOperations.getAll();
+    // SQLiteが利用できない場合はJSONストレージを使用
+    let allSnippets;
+    try {
+      allSnippets = await SnippetOperations.getAll();
+    } catch (sqliteError) {
+      log.warn('SQLite使用不可、JSONストレージを使用します');
+      allSnippets = await JsonSnippetOperations.getAll();
+    }
     
     // === 使用回数順でのソート ===
     // 何をする部分か：useCountが多い順に並び替え
@@ -275,7 +291,14 @@ async function getRecentSnippets(limit: number) {
  */
 async function getFavoriteSnippets(limit: number) {
   try {
-    const searchResult = await SnippetOperations.search({ isFavorite: true });
+    // SQLiteが利用できない場合はJSONストレージを使用
+    let searchResult;
+    try {
+      searchResult = await SnippetOperations.search({ isFavorite: true });
+    } catch (sqliteError) {
+      log.warn('SQLite使用不可、JSONストレージを使用します');
+      searchResult = await JsonSnippetOperations.search({ isFavorite: true });
+    }
     return searchResult.slice(0, limit);
     
   } catch (error) {
@@ -314,7 +337,8 @@ async function copySnippetToClipboard(snippetId: number, content: string): Promi
  * @returns Promise<string> 置換後のテキスト
  */
 async function replacePlaceholders(content: string): Promise<string> {
-  const { os } = require('os');
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const os = require('os');
   const now = new Date();
   
   // === 日時フォーマットの準備 ===

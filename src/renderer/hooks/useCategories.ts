@@ -35,6 +35,11 @@ export function useCategories(): UseCategoriesReturn {
       setLoading(true);
       setError(null);
 
+      // Electron APIの利用可能性をチェック
+      if (!window.electronAPI || !window.electronAPI.category) {
+        throw new Error('Electron APIが利用できません');
+      }
+
       const response = await window.electronAPI.category.getAll();
       
       if (response.success) {

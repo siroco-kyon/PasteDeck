@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC_CHANNELS } from '@/shared/types';
+import { IPC_CHANNELS } from '../shared/types';
 import type {
   IPCResponse,
   CreateSnippetInput,
@@ -7,7 +7,7 @@ import type {
   CreateCategoryInput,
   UpdateCategoryInput,
   SearchFilters,
-} from '@/shared/types';
+} from '../shared/types';
 
 // === プリロードスクリプト ===
 // 何をする部分か：レンダラープロセスがメインプロセスと安全に通信するためのAPI公開
@@ -28,6 +28,16 @@ interface ElectronAPI {
     delete(id: number): Promise<IPCResponse>;
     copyToClipboard(id: number): Promise<IPCResponse>;
     incrementUseCount(id: number): Promise<IPCResponse>;
+    reorder(items: Array<{ id: number; sortOrder: number }>): Promise<IPCResponse>;
+    duplicate(id: number): Promise<IPCResponse>; // 複製
+  };
+
+  // === データ管理API ===
+  // 何をする部分か：全データのJSON形式でのエクスポートとインポートを提供
+  // なぜ必要か：バックアップ・データ移行・復元機能のため
+  data: {
+    export(): Promise<IPCResponse>;
+    import(): Promise<IPCResponse>;
   };
 
   // === カテゴリ操作API ===
@@ -37,6 +47,16 @@ interface ElectronAPI {
     create(input: CreateCategoryInput): Promise<IPCResponse>;
     update(id: number, input: UpdateCategoryInput): Promise<IPCResponse>;
     delete(id: number): Promise<IPCResponse>;
+    reorder(items: Array<{ id: number; sortOrder: number }>): Promise<IPCResponse>;
+  };
+
+  // === 設定操作API ===
+  // 何をする部分か：アプリ設定の取得・保存・リセットを提供
+  // なぜ必要か：テーマや通知設定などのユーザー設定を永続化するため
+  settings: {
+    get(): Promise<IPCResponse>;
+    set(key: string, value: unknown): Promise<IPCResponse>;
+    reset(): Promise<IPCResponse>;
   };
 
   // === システム操作API ===
@@ -73,39 +93,36 @@ interface ElectronAPI {
 try {
   const electronAPI: ElectronAPI = {
     // === スニペット操作の公開 ===
-    // 何をする部分か：スニペットのCRUD操作をレンダラー側に提供
-    // なぜ必要か：UI層からデータベース操作を行えるようにするため
     snippet: {
       async getAll() {
         return await ipcRenderer.invoke(IPC_CHANNELS.SNIPPET.GET_ALL);
       },
-
-      async getById(id: number) {
+      async getById(id) {
         return await ipcRenderer.invoke(IPC_CHANNELS.SNIPPET.GET_BY_ID, id);
       },
-
-      async search(filters: SearchFilters) {
+      async search(filters) {
         return await ipcRenderer.invoke(IPC_CHANNELS.SNIPPET.SEARCH, filters);
       },
-
-      async create(input: CreateSnippetInput) {
+      async create(input) {
         return await ipcRenderer.invoke(IPC_CHANNELS.SNIPPET.CREATE, input);
       },
-
-      async update(id: number, input: UpdateSnippetInput) {
+      async update(id, input) {
         return await ipcRenderer.invoke(IPC_CHANNELS.SNIPPET.UPDATE, id, input);
       },
-
-      async delete(id: number) {
+      async delete(id) {
         return await ipcRenderer.invoke(IPC_CHANNELS.SNIPPET.DELETE, id);
       },
-
-      async copyToClipboard(id: number) {
+      async copyToClipboard(id) {
         return await ipcRenderer.invoke(IPC_CHANNELS.SNIPPET.COPY_TO_CLIPBOARD, id);
       },
-
-      async incrementUseCount(id: number) {
+      async incrementUseCount(id) {
         return await ipcRenderer.invoke(IPC_CHANNELS.SNIPPET.INCREMENT_USE_COUNT, id);
+      },
+      async reorder(items) {
+        return await ipcRenderer.invoke(IPC_CHANNELS.SNIPPET.REORDER, items);
+      },
+      async duplicate(id) {
+        return await ipcRenderer.invoke(IPC_CHANNELS.SNIPPET.DUPLICATE, id);
       },
     },
 
@@ -114,37 +131,59 @@ try {
       async getAll() {
         return await ipcRenderer.invoke(IPC_CHANNELS.CATEGORY.GET_ALL);
       },
-
-      async getById(id: number) {
+      async getById(id) {
         return await ipcRenderer.invoke(IPC_CHANNELS.CATEGORY.GET_BY_ID, id);
       },
-
-      async create(input: CreateCategoryInput) {
+      async create(input) {
         return await ipcRenderer.invoke(IPC_CHANNELS.CATEGORY.CREATE, input);
       },
-
-      async update(id: number, input: UpdateCategoryInput) {
+      async update(id, input) {
         return await ipcRenderer.invoke(IPC_CHANNELS.CATEGORY.UPDATE, id, input);
       },
-
-      async delete(id: number) {
+      async delete(id) {
         return await ipcRenderer.invoke(IPC_CHANNELS.CATEGORY.DELETE, id);
+      },
+      async reorder(items) {
+        return await ipcRenderer.invoke(IPC_CHANNELS.CATEGORY.REORDER, items);
+      },
+    },
+
+    // === データ管理の公開 ===
+    // 何をする部分か：インポート/エクスポート機能をレンダラー側に提供
+    // なぜ必要か：UIからデータバックアップ操作を可能にするため
+    data: {
+      async export() {
+        return await ipcRenderer.invoke(IPC_CHANNELS.DATA.EXPORT);
+      },
+      async import() {
+        return await ipcRenderer.invoke(IPC_CHANNELS.DATA.IMPORT);
+      },
+    },
+
+    // === 設定操作の公開 ===
+    // 何をする部分か：設定のCRUD操作をレンダラー側に提供
+    // なぜ必要か：ユーザー設定の永続化をUIから操作できるようにするため
+    settings: {
+      async get() {
+        return await ipcRenderer.invoke(IPC_CHANNELS.SETTINGS.GET);
+      },
+      async set(key, value) {
+        return await ipcRenderer.invoke(IPC_CHANNELS.SETTINGS.SET, key, value);
+      },
+      async reset() {
+        return await ipcRenderer.invoke(IPC_CHANNELS.SETTINGS.RESET);
       },
     },
 
     // === システム操作の公開 ===
-    // 何をする部分か：クリップボードや通知などのシステム機能にアクセス
-    // なぜ必要か：ブラウザでは直接アクセスできないOS機能を利用するため
     system: {
       async getClipboard() {
         return await ipcRenderer.invoke(IPC_CHANNELS.SYSTEM.GET_CLIPBOARD);
       },
-
-      async setClipboard(text: string) {
+      async setClipboard(text) {
         return await ipcRenderer.invoke(IPC_CHANNELS.SYSTEM.SET_CLIPBOARD, text);
       },
-
-      async showNotification(title: string, body: string) {
+      async showNotification(title, body) {
         return await ipcRenderer.invoke(IPC_CHANNELS.SYSTEM.SHOW_NOTIFICATION, title, body);
       },
     },
@@ -154,11 +193,9 @@ try {
       async getVersion() {
         return await ipcRenderer.invoke(IPC_CHANNELS.APP.GET_VERSION);
       },
-
       async toggleVisibility() {
         return await ipcRenderer.invoke(IPC_CHANNELS.APP.TOGGLE_VISIBILITY);
       },
-
       async quit() {
         return await ipcRenderer.invoke(IPC_CHANNELS.APP.QUIT);
       },
@@ -168,17 +205,10 @@ try {
     // 何をする部分か：メインプロセスからレンダラーへのメッセージ受信機能
     // なぜ必要か：ショートカット等の外部トリガーに対応するため
     on: {
-      quickSearch(callback: () => void) {
-        // === グローバルショートカット受信 ===
-        // 何をする部分か：Ctrl+Shift+Q 押下時の検索フォーカス処理
-        // なぜ必要か：ショートカットでの検索モード起動を実現するため
+      quickSearch(callback) {
         ipcRenderer.on('shortcut:quick-search', callback);
       },
-
-      navigateToSettings(callback: () => void) {
-        // === トレイメニューからの設定画面遷移 ===
-        // 何をする部分か：システムトレイの設定メニュー選択時の処理
-        // なぜ必要か：UI側で適切な画面遷移を行うため
+      navigateToSettings(callback) {
         ipcRenderer.on('navigate-to-settings', callback);
       },
     },
@@ -190,28 +220,17 @@ try {
       quickSearch() {
         ipcRenderer.removeAllListeners('shortcut:quick-search');
       },
-
       navigateToSettings() {
         ipcRenderer.removeAllListeners('navigate-to-settings');
       },
     },
   };
 
-  // === API の公開実行 ===
-  // 何をする部分か：electronAPI オブジェクトをレンダラーのwindowオブジェクトに追加
-  // なぜ必要か：React コンポーネントから window.electronAPI でアクセスできるようにするため
   contextBridge.exposeInMainWorld('electronAPI', electronAPI);
-
   console.log('プリロードスクリプトが正常に初期化されました');
 
 } catch (error) {
-  // === エラーハンドリング ===
-  // 何をする部分か：プリロード初期化失敗時のエラー記録
-  // なぜ必要か：API が利用できない原因を把握するため
   console.error('プリロードスクリプト初期化でエラーが発生:', error);
 }
 
-// === 型定義のエクスポート ===
-// 何をする部分か：TypeScript での型チェックを可能にする
-// なぜ必要か：レンダラー側でのコンパイルエラーを防ぐため
 export type { ElectronAPI };

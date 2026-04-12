@@ -28,6 +28,7 @@ interface HeaderProps {
   onFavoriteToggle: (showFavorites: boolean) => void;
   onThemeToggle: () => void;
   onRefresh: () => void;
+  onSettingsOpen: () => void; // 設定ダイアログを開く
   darkMode: boolean;
   isLoading: boolean;
 }
@@ -37,56 +38,39 @@ const Header: React.FC<HeaderProps> = ({
   onFavoriteToggle,
   onThemeToggle,
   onRefresh,
+  onSettingsOpen,
   darkMode,
   isLoading,
 }) => {
-  // === 状態管理 ===
-  // 何をする部分か：検索入力とお気に入り表示の状態を管理
-  // なぜ必要か：ユーザー操作の状態をUIに反映するため
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [showFavorites, setShowFavorites] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFavorites, setShowFavorites] = useState(false);
 
   // === 検索入力ハンドリング ===
-  // 何をする部分か：検索文字列の変更を検知して親コンポーネントに通知
-  // なぜ必要か：リアルタイム検索機能を実現するため
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value;
+  // 何をする部分か：入力と同時にリアルタイム検索を実行
+  // なぜ必要か：素早いフィルタリングでユーザビリティを向上させるため
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
     setSearchQuery(value);
-    
-    // === リアルタイム検索の実装 ===
-    // 何をする部分か：入力と同時に検索を実行
-    // なぜ必要か：素早いフィルタリングでユーザビリティを向上させるため
     onSearch(value);
   };
 
-  // === 検索フィールドクリア ===
-  // 何をする部分か：検索条件をリセットして全件表示に戻す
-  // なぜ必要か：検索状態から素早く元の表示に戻るため
   const handleSearchClear = () => {
     setSearchQuery('');
     onSearch('');
   };
 
-  // === お気に入り表示切り替え ===
-  // 何をする部分か：お気に入りのみ表示とすべて表示を切り替え
-  // なぜ必要か：よく使うスニペットへの素早いアクセスを提供するため
   const handleFavoriteToggle = () => {
-    const newShowFavorites = !showFavorites;
-    setShowFavorites(newShowFavorites);
-    onFavoriteToggle(newShowFavorites);
+    const next = !showFavorites;
+    setShowFavorites(next);
+    onFavoriteToggle(next);
   };
 
-  // === Enterキーでの検索実行 ===
-  // 何をする部分か：Enterキー押下時の検索フォーカス維持
-  // なぜ必要か：キーボード操作での使いやすさ向上のため
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      // 既にリアルタイム検索で処理済みなので、フォーカス維持のみ
-      (event.target as HTMLInputElement).blur();
-      setTimeout(() => {
-        (event.target as HTMLInputElement).focus();
-      }, 100);
+  // === キーボード処理 ===
+  // 何をする部分か：Escape キー押下で検索をクリアする
+  // なぜ必要か：キーボードだけで検索解除できるようにするため
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      handleSearchClear();
     }
   };
 
@@ -94,7 +78,6 @@ const Header: React.FC<HeaderProps> = ({
     <AppBar position="static" elevation={1}>
       <Toolbar sx={{ gap: 2 }}>
         {/* === 検索フィールド === */}
-        {/* 何をする部分か：スニペットタイトル・内容・タグでの文字列検索UI */}
         <Box sx={{ flexGrow: 1, maxWidth: 400 }}>
           <TextField
             size="small"
@@ -111,12 +94,8 @@ const Header: React.FC<HeaderProps> = ({
               ),
               endAdornment: searchQuery && (
                 <InputAdornment position="end">
-                  <IconButton
-                    size="small"
-                    onClick={handleSearchClear}
-                    edge="end"
-                  >
-                    <span style={{ fontSize: '18px', color: 'gray' }}>×</span>
+                  <IconButton size="small" onClick={handleSearchClear} edge="end">
+                    <span style={{ fontSize: '18px', lineHeight: 1 }}>×</span>
                   </IconButton>
                 </InputAdornment>
               ),
@@ -124,75 +103,47 @@ const Header: React.FC<HeaderProps> = ({
             sx={{
               bgcolor: 'background.paper',
               borderRadius: 1,
-              '& .MuiOutlinedInput-root': {
-                '& fieldset': {
-                  borderColor: 'transparent',
-                },
-                '&:hover fieldset': {
-                  borderColor: 'primary.main',
-                },
-                '&.Mui-focused fieldset': {
-                  borderColor: 'primary.main',
-                },
-              },
+              '& .MuiOutlinedInput-root fieldset': { borderColor: 'transparent' },
+              '& .MuiOutlinedInput-root:hover fieldset': { borderColor: 'primary.main' },
+              '& .MuiOutlinedInput-root.Mui-focused fieldset': { borderColor: 'primary.main' },
             }}
           />
         </Box>
 
         {/* === 操作ボタン群 === */}
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          {/* === お気に入り表示切り替えボタン === */}
-          {/* 何をする部分か：お気に入りのみ/すべて表示の切り替えUI */}
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          {/* お気に入りフィルター */}
           <Tooltip title={showFavorites ? 'すべて表示' : 'お気に入りのみ表示'}>
             <IconButton
               color={showFavorites ? 'secondary' : 'default'}
               onClick={handleFavoriteToggle}
-              sx={{
-                bgcolor: showFavorites ? 'secondary.light' : 'transparent',
-                '&:hover': {
-                  bgcolor: showFavorites ? 'secondary.main' : 'action.hover',
-                },
-              }}
+              sx={{ bgcolor: showFavorites ? 'rgba(245,0,87,0.12)' : 'transparent' }}
             >
               {showFavorites ? <StarIcon /> : <StarBorderIcon />}
             </IconButton>
           </Tooltip>
 
-          {/* === 更新ボタン === */}
-          {/* 何をする部分か：データ再読み込みのUI */}
-          {/* なぜ必要か：手動でのデータ最新化を可能にするため */}
+          {/* 更新ボタン */}
           <Tooltip title="データを更新">
-            <IconButton
-              color="default"
-              onClick={onRefresh}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <CircularProgress size={24} />
-              ) : (
-                <RefreshIcon />
-              )}
-            </IconButton>
+            <span>
+              <IconButton color="default" onClick={onRefresh} disabled={isLoading}>
+                {isLoading ? <CircularProgress size={24} color="inherit" /> : <RefreshIcon />}
+              </IconButton>
+            </span>
           </Tooltip>
 
-          {/* === テーマ切り替えボタン === */}
-          {/* 何をする部分か：ライト/ダークモード切り替えUI */}
+          {/* テーマ切り替え */}
           <Tooltip title={darkMode ? 'ライトモード' : 'ダークモード'}>
             <IconButton color="default" onClick={onThemeToggle}>
               {darkMode ? <LightModeIcon /> : <DarkModeIcon />}
             </IconButton>
           </Tooltip>
 
-          {/* === 設定ボタン === */}
-          {/* 何をする部分か：設定画面へのアクセスUI（将来の拡張用） */}
+          {/* 設定ボタン */}
+          {/* 何をする部分か：設定ダイアログを開くボタン */}
+          {/* なぜ必要か：テーマ・通知等のユーザー設定画面へのアクセスを提供するため */}
           <Tooltip title="設定">
-            <IconButton
-              color="default"
-              onClick={() => {
-                // TODO: 設定画面の実装
-                console.log('設定画面を開く');
-              }}
-            >
+            <IconButton color="default" onClick={onSettingsOpen}>
               <SettingsIcon />
             </IconButton>
           </Tooltip>

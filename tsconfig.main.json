@@ -12,7 +12,7 @@
     // === 出力設定 ===
     // 何をする部分か：コンパイル後のJavaScriptファイルの出力先を指定
     // なぜ必要か：Electronが実行するメインプロセスファイルを生成するため
-    "outDir": "dist/main",
+    "outDir": "dist",
     "rootDir": "src",
     "noEmit": false,
     "declaration": true,

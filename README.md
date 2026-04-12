@@ -1,228 +1,201 @@
-# 📋 Clipboard Manager - スニペット管理アプリケーション
+# PasteDeck
 
-TypeScript + React + Electron で構築された、ローカル完結型のスニペット管理デスクトップアプリケーションです。
-よく使う定型文、コードスニペット、画像を効率的に管理し、ワンクリックでクリップボードにコピーできます。
+TypeScript + React + Electron で構築した、ローカル完結型のスニペット管理デスクトップアプリケーションです。
+よく使う定型文・コードスニペットをカテゴリで整理し、ワンクリックでクリップボードにコピーできます。
 
-## ✨ 主要機能
+## 機能一覧
 
-### 📁 スニペット管理
-- **テキスト・HTML・画像対応**: 様々な形式のコンテンツを保存
-- **カテゴリ別整理**: プロジェクトや用途に応じて分類
-- **タグ機能**: 柔軟な分類と検索
-- **お気に入り機能**: よく使うスニペットの優先表示
-- **使用統計**: 利用頻度に基づく自動ソート
+### スニペット管理
+- 作成・編集・削除・複製
+- タイトル / コンテンツ / タグ / お気に入り設定
+- グリッド表示とリスト表示の切り替え
+- ドラッグ&ドロップによる並び替え（リスト表示時）
+- タグクリックによる絞り込み
+- 使用回数の自動カウント
 
-### 🔍 高速検索
-- **リアルタイム検索**: 入力と同時にフィルタリング
-- **全文検索**: タイトル・内容・タグを横断検索
-- **複合フィルタ**: カテゴリ・タイプ・お気に入りで絞り込み
+### カテゴリ管理
+- 作成・編集・削除
+- アイコン・カラー設定
+- ドラッグ&ドロップによる並び替え
 
-### ⚡ グローバルアクセス
-- **システムトレイ**: バックグラウンドで常駐
-- **グローバルショートカット**: 
-  - `Ctrl+Shift+V`: アプリ表示/非表示
-  - `Ctrl+Shift+Q`: クイック検索モード
-- **ワンクリックコピー**: 選択したスニペットを即座にクリップボードへ
+### 検索・フィルタ
+- リアルタイム全文検索（タイトル / コンテンツ / タグ）
+- カテゴリ・お気に入りでの絞り込み
+- `Esc` キーで検索クリア
 
-### 🎨 ユーザーエクスペリエンス
-- **ダークモード対応**: システム設定に自動追従
-- **レスポンシブUI**: ウィンドウサイズに応じた最適表示
-- **プレースホルダー機能**: 動的な値の自動置換
-  - `{date}` → 現在日付 (2024/01/15)
-  - `{time}` → 現在時刻 (14:30)
-  - `{username}` → OSユーザー名
-  - `{clipboard}` → 現在のクリップボード内容
+### グローバルアクセス
+- システムトレイ常駐
+- `Ctrl+Shift+V`: アプリ表示 / 非表示
+- `Ctrl+Shift+Q`: クイック検索フォーカス
+- トレイメニューから最近使用・お気に入りスニペットに直接アクセス
 
-## 🛠️ 技術スタック
+### プレースホルダー置換
+コピー時に動的な値へ自動展開されます。
 
-| カテゴリ | 技術 | 用途 |
-|---------|------|------|
-| **コア** | Electron 27.x | デスクトップアプリ基盤 |
-| | React 18.x | ユーザーインターフェース |
-| | TypeScript 5.x | 型安全な開発 |
-| **UI** | Material-UI v5 | デザインシステム |
-| | React Beautiful DnD | ドラッグ&ドロップ |
-| **データ** | Better SQLite3 | ローカルデータベース |
-| **ビルド** | Vite 5.x | 高速ビルドシステム |
-| | Electron Builder | 配布パッケージ生成 |
+| プレースホルダー | 展開値 |
+|---|---|
+| `{date}` | 現在日付（2025/04/12） |
+| `{time}` | 現在時刻（20:30） |
+| `{datetime}` | 日時（2025/04/12 20:30） |
+| `{username}` | OS ユーザー名 |
+| `{clipboard}` | 現在のクリップボード内容 |
 
-## 🚀 セットアップ手順
+### 設定
+- ライト / ダーク / 自動テーマ
+- 通知表示の ON/OFF
+- × ボタンでトレイ最小化の ON/OFF
+- 全データの JSON エクスポート / インポート（バックアップ・移行）
+- 設定のリセット
+
+## 技術スタック
+
+| カテゴリ | 採用技術 |
+|---|---|
+| フレームワーク | Electron 27 |
+| UI | React 18 + Material-UI v5 |
+| 言語 | TypeScript 5 |
+| データベース | Better SQLite3（JSON フォールバック付き） |
+| ビルド | Vite 5 / esbuild / electron-builder |
+| DnD | react-beautiful-dnd |
+
+## セットアップ
 
 ### 前提条件
-- Node.js 18.x 以上
-- npm または yarn
+- Node.js 18 以上
 
 ### インストール
 
-1. **リポジトリのクローン**
 ```bash
-git clone <repository-url>
-cd clipboard-manager
-```
-
-2. **依存関係のインストール**
-```bash
+git clone https://github.com/siroco-kyon/PasteDeck.git
+cd PasteDeck
 npm install
 ```
 
-3. **開発サーバーの起動**
+### ネイティブモジュールのリビルド（Windows 必須）
+
+better-sqlite3 は Electron 向けにリビルドが必要です。
+
+```bash
+node -e "require('@electron/rebuild').rebuild({ electronVersion: '27.3.11', force: true })"
+```
+
+### 開発サーバー起動
+
 ```bash
 npm run dev
 ```
 
-### ビルドコマンド
+## ビルドコマンド
 
 | コマンド | 説明 |
-|----------|------|
-| `npm run dev` | 開発モード起動 |
+|---|---|
+| `npm run dev` | 開発モード（Vite + Electron） |
 | `npm run build` | 全体ビルド |
-| `npm run build:win` | Windows向けビルド |
-| `npm run build:mac` | macOS向けビルド |
-| `npm run build:linux` | Linux向けビルド |
-| `npm run lint` | ESLint実行 |
-| `npm test` | テスト実行 |
+| `npm run build:main` | メインプロセスのみビルド |
+| `npm run build:preload` | プリロードスクリプトのみビルド（esbuild） |
+| `npm run build:renderer` | レンダラーのみビルド |
+| `npm run build:win` | Windows インストーラー生成 |
+| `npm run build:mac` | macOS DMG 生成 |
+| `npm run build:linux` | Linux AppImage 生成 |
+| `npm run test:startup` | 起動スモークテスト（3 秒で自動終了） |
+| `npx tsc --noEmit` | レンダラーの型チェック |
 
-## 📂 プロジェクト構成
+## プロジェクト構成
 
 ```
-clipboard-manager/
+PasteDeck/
 ├── src/
-│   ├── main/              # Electronメインプロセス
-│   │   ├── main.ts         # エントリーポイント
-│   │   ├── db/            # SQLiteデータベース
-│   │   ├── ipc/           # IPCハンドラー
-│   │   ├── shortcuts/     # グローバルショートカット
-│   │   └── tray/          # システムトレイ管理
-│   ├── preload/           # プリロードスクリプト
-│   ├── renderer/          # Reactアプリケーション
-│   │   ├── App.tsx        # メインコンポーネント
-│   │   ├── components/    # UIコンポーネント
-│   │   ├── hooks/         # カスタムフック
-│   │   └── utils/         # ユーティリティ
-│   └── shared/           # 共通型定義
-├── resources/            # アイコン等のリソース
-├── electron-builder.yml # ビルド設定
-├── vite.config.ts       # Vite設定
-└── README.md
+│   ├── main/                  # Electron メインプロセス（Node.js）
+│   │   ├── main.ts            # エントリーポイント
+│   │   ├── db/
+│   │   │   ├── schema.ts      # SQLite スキーマ・初期化
+│   │   │   ├── operations.ts  # SQLite CRUD
+│   │   │   └── jsonStorage.ts # JSON フォールバックストレージ
+│   │   ├── ipc/
+│   │   │   └── handlers.ts    # IPC ハンドラー（プレースホルダー置換含む）
+│   │   ├── shortcuts/         # グローバルショートカット
+│   │   └── tray/              # システムトレイ管理
+│   ├── preload/
+│   │   └── preload.ts         # contextBridge API 定義
+│   ├── renderer/              # React アプリ（ブラウザ環境）
+│   │   ├── App.tsx
+│   │   ├── components/
+│   │   │   ├── Category/      # CategoryTabs, CategoryFormDialog, CategoryReorderDialog
+│   │   │   ├── Header/        # 検索バー・ツールバー
+│   │   │   ├── Settings/      # SettingsDialog
+│   │   │   ├── Snippet/       # SnippetList, SnippetCard, SnippetFormDialog
+│   │   │   └── common/        # ConfirmDialog
+│   │   └── hooks/
+│   │       ├── useCategories.ts
+│   │       ├── useSnippets.ts
+│   │       ├── useTheme.ts
+│   │       └── useElectronEvents.ts
+│   └── shared/
+│       └── types.ts           # IPC チャンネル名・共通型定義
+├── scripts/
+│   └── build-preload.js       # esbuild でプリロードをバンドル
+├── tsconfig.json              # レンダラー用（ESM / ブラウザ）
+├── tsconfig.main.json         # メインプロセス用（CJS / Node.js）
+├── tsconfig.preload.json      # プリロード型チェック用
+└── vite.config.ts
 ```
 
-## 🎯 使用方法
+## アーキテクチャ
 
-### 初回起動
-アプリケーション初回起動時に、以下が自動実行されます：
-- SQLiteデータベースの作成
-- サンプルカテゴリ・スニペットの挿入
-- システムトレイへの登録
+### Electron マルチプロセス構成
 
-### 基本操作
-
-1. **スニペット作成**
-   - 「+」ボタンまたは右クリックメニューから新規作成
-   - タイトル・内容・カテゴリ・タグを設定
-
-2. **スニペット使用**
-   - 一覧からスニペットをクリック
-   - システムトレイメニューから選択
-   - グローバルショートカットで検索後選択
-
-3. **カテゴリ管理**
-   - タブの「+」ボタンから新規作成
-   - カテゴリ名・アイコン・色をカスタマイズ
-
-### ショートカットキー
-
-| ショートカット | 機能 |
-|---------------|------|
-| `Ctrl+Shift+V` | アプリ表示/非表示切り替え |
-| `Ctrl+Shift+Q` | クイック検索モード |
-| `Enter` | 検索実行 |
-| `Esc` | 検索クリア |
-
-## 🔧 カスタマイズ
-
-### プレースホルダーの追加
-`src/main/ipc/handlers.ts` の `replacePlaceholders` 関数で、独自のプレースホルダーを追加できます。
-
-```typescript
-const replacements = {
-  '{date}': dateStr,
-  '{time}': timeStr,
-  '{custom}': 'your-custom-value',
-  // 追加のプレースホルダー
-};
+```
+レンダラープロセス (React)
+    ↕ window.electronAPI.*
+プリロードスクリプト (contextBridge)
+    ↕ ipcRenderer.invoke / ipcMain.handle
+メインプロセス (Node.js)
+    ↕
+SQLite / JSON ストレージ
 ```
 
-### テーマカスタマイズ
-`src/renderer/App.tsx` の Material-UI テーマ設定で、カラーパレットやコンポーネントスタイルをカスタマイズできます。
+- `contextIsolation: true` / `nodeIntegration: false` でセキュリティを確保
+- プリロードは **esbuild でバンドル**し、Electron サンドボックス内の `require` 制限を回避
 
-## 🔒 セキュリティ
+### ストレージ
 
-- **Context Isolation**: レンダラープロセスとメインプロセスの分離
-- **Node Integration無効化**: ブラウザセキュリティモデルの維持
-- **CSP適用**: Content Security Policyによる制限
-- **IPC検証**: 全ての通信データの入力値検証
+- **SQLite（primary）**: Better SQLite3 によるローカル DB
+- **JSON（fallback）**: SQLite が利用できない環境（WSL など）でも動作
 
-## 🐛 トラブルシューティング
+## トラブルシューティング
 
-### よくある問題
+### better-sqlite3 が起動しない（Windows）
 
-**Q: アプリが起動しない**
-- Node.js 18.x以上がインストールされているか確認
-- `npm install` を再実行してください
+Electron 向けのリビルドが必要です。
 
-**Q: データベースエラーが発生する**
-- アプリデータフォルダの権限を確認
-- ログファイル: `~/.config/clipboard-manager/logs/`
+```bash
+node -e "require('@electron/rebuild').rebuild({ electronVersion: '27.3.11', force: true })"
+```
 
-**Q: グローバルショートカットが動作しない**
-- 他のアプリケーションとの競合を確認
-- 管理者権限で実行してみてください
+失敗した場合でも、アプリは JSON ストレージにフォールバックして動作します。
 
-**Q: システムトレイアイコンが表示されない**
-- OS の通知エリア設定を確認
-- アプリを再起動してください
+### 依存関係を完全リセット
+
+```bash
+rm -rf node_modules package-lock.json
+npm install
+```
 
 ### ログファイルの場所
-- **Windows**: `%APPDATA%/clipboard-manager/logs/`
-- **macOS**: `~/Library/Logs/clipboard-manager/`
-- **Linux**: `~/.config/clipboard-manager/logs/`
 
-## 🤝 コントリビューション
+| OS | パス |
+|---|---|
+| Windows | `%APPDATA%\clipboard-manager\logs\` |
+| macOS | `~/Library/Logs/clipboard-manager/` |
+| Linux | `~/.config/clipboard-manager/logs/` |
 
-プルリクエストやイシュー報告を歓迎します！
+### データベースのリセット
 
-1. フォークしてください
-2. 機能ブランチを作成: `git checkout -b feature/amazing-feature`
-3. 変更をコミット: `git commit -m 'Add amazing feature'`
-4. ブランチをプッシュ: `git push origin feature/amazing-feature`
-5. プルリクエストを開いてください
+| OS | パス |
+|---|---|
+| Windows | `%APPDATA%\clipboard-manager\` を削除 |
+| Linux | `~/.config/clipboard-manager/` を削除 |
 
-## 📄 ライセンス
+## ライセンス
 
-MIT License - 詳細は [LICENSE](LICENSE) ファイルをご覧ください。
-
-## 🚧 開発ロードマップ
-
-### Phase 1 (完了)
-- ✅ 基本的なCRUD操作
-- ✅ SQLite連携
-- ✅ テキストスニペット対応
-
-### Phase 2 (完了)
-- ✅ グローバルショートカット
-- ✅ システムトレイ
-- ✅ プレースホルダー機能
-
-### Phase 3 (開発中)
-- 🔄 画像・HTML対応
-- 🔄 ドラッグ&ドロップ
-- 🔄 使用統計画面
-
-### Phase 4 (予定)
-- 📋 エクスポート/インポート
-- 📋 クラウド同期
-- 📋 プラグインシステム
-
----
-
-❤️ **Clipboard Manager** で、あなたのコピペ作業を効率化しましょう！
+MIT
