@@ -15,7 +15,7 @@ import {
   Droppable,
   Draggable,
   DropResult,
-} from 'react-beautiful-dnd';
+} from '@hello-pangea/dnd';
 import {
   DragIndicator as DragIcon,
   Folder as FolderIcon,

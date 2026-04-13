@@ -213,14 +213,33 @@ async function cleanupApp(): Promise<void> {
 
 // === Electronアプリケーションイベント処理 ===
 
-/**
- * app.whenReady イベント
- * Electronの初期化完了後に呼び出される
- */
-app.whenReady().then(initializeApp).catch((error) => {
-  log.error('アプリケーション起動でエラーが発生:', error);
-  process.exit(1);
-});
+// === シングルインスタンス制御 ===
+// 何をする部分か：アプリが既に起動中の場合、2つ目のプロセスを即終了し既存ウィンドウを前面に出す
+// なぜ必要か：タスクバーや起動ショートカットをクリックするたびに多重起動されるのを防ぐため
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  // 既にインスタンスが存在するので即終了
+  app.quit();
+} else {
+  // 2つ目の起動が試みられた時のイベント（既存インスタンス側で発火）
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+
+  /**
+   * app.whenReady イベント
+   * Electronの初期化完了後に呼び出される
+   */
+  app.whenReady().then(initializeApp).catch((error) => {
+    log.error('アプリケーション起動でエラーが発生:', error);
+    process.exit(1);
+  });
+}
 
 /**
  * すべてのウィンドウが閉じられた時の処理

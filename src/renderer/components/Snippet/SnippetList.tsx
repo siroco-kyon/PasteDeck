@@ -21,7 +21,7 @@ import {
   Droppable,
   Draggable,
   DropResult,
-} from 'react-beautiful-dnd';
+} from '@hello-pangea/dnd';
 import SnippetCard from './SnippetCard';
 import type { Snippet } from '@/shared/types';
 
