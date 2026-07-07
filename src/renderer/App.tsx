@@ -5,6 +5,7 @@ import { Box, Container, Alert, Snackbar } from '@mui/material';
 import Header from './components/Header/Header';
 import CategoryTabs from './components/Category/CategoryTabs';
 import SnippetList from './components/Snippet/SnippetList';
+import CompactSnippetList from './components/Snippet/CompactSnippetList';
 import SnippetFormDialog from './components/Snippet/SnippetFormDialog';
 import CategoryFormDialog from './components/Category/CategoryFormDialog';
 import SettingsDialog from './components/Settings/SettingsDialog';
@@ -391,23 +392,35 @@ function App() {
           />
 
           {/* === スニペット一覧 === */}
-          <Container maxWidth={compactMode ? false : 'lg'} sx={{ flex: 1, py: compactMode ? 1 : 2, overflow: 'auto' }}>
-            <SnippetList
-              snippets={snippets}
-              loading={snippetsLoading}
-              onSnippetSelect={handleSnippetSelect}
-              onSnippetEdit={handleOpenEditSnippet}
-              onSnippetDelete={handleSnippetDeleteRequest}
-              onSnippetDuplicate={handleSnippetDuplicate}
-              onDataChange={refetchSnippets}
-              onCreateClick={handleOpenCreateSnippet}
-              onReorder={handleSnippetReorder}
-              onTagClick={handleTagClick}
-              activeTagFilter={searchFilters.tags?.[0]}
-              onClearTagFilter={handleClearTagFilter}
-              compact={compactMode}
-            />
-          </Container>
+          {/* 何をする部分か：コンパクトモード時はタイトルのみの縦リスト、通常時は従来のグリッド/リスト表示 */}
+          {/* なぜ必要か：コンパクトモードは密度調整ではなくレイアウト自体を差し替える仕様のため */}
+          {compactMode ? (
+            <Box sx={{ flex: 1, overflow: 'hidden' }}>
+              <CompactSnippetList
+                snippets={snippets}
+                onSnippetSelect={handleSnippetSelect}
+                onSnippetEdit={handleOpenEditSnippet}
+                onCreateClick={handleOpenCreateSnippet}
+              />
+            </Box>
+          ) : (
+            <Container maxWidth="lg" sx={{ flex: 1, py: 2, overflow: 'auto' }}>
+              <SnippetList
+                snippets={snippets}
+                loading={snippetsLoading}
+                onSnippetSelect={handleSnippetSelect}
+                onSnippetEdit={handleOpenEditSnippet}
+                onSnippetDelete={handleSnippetDeleteRequest}
+                onSnippetDuplicate={handleSnippetDuplicate}
+                onDataChange={refetchSnippets}
+                onCreateClick={handleOpenCreateSnippet}
+                onReorder={handleSnippetReorder}
+                onTagClick={handleTagClick}
+                activeTagFilter={searchFilters.tags?.[0]}
+                onClearTagFilter={handleClearTagFilter}
+              />
+            </Container>
+          )}
         </Box>
 
         {/* ─── ダイアログ群 ─── */}
