@@ -17,6 +17,10 @@ import {
   LightMode as LightModeIcon,
   DarkMode as DarkModeIcon,
   Settings as SettingsIcon,
+  PushPin as PushPinIcon,
+  PushPinOutlined as PushPinOutlinedIcon,
+  PhotoSizeSelectSmall as CompactIcon,
+  Fullscreen as NormalSizeIcon,
 } from '@mui/icons-material';
 
 // === ヘッダーコンポーネント ===
@@ -31,6 +35,10 @@ interface HeaderProps {
   onSettingsOpen: () => void; // 設定ダイアログを開く
   darkMode: boolean;
   isLoading: boolean;
+  alwaysOnTop: boolean; // 常に最前面固定モードの現在値
+  onToggleAlwaysOnTop: () => void;
+  compactMode: boolean; // コンパクトモードの現在値
+  onToggleCompactMode: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -41,6 +49,10 @@ const Header: React.FC<HeaderProps> = ({
   onSettingsOpen,
   darkMode,
   isLoading,
+  alwaysOnTop,
+  onToggleAlwaysOnTop,
+  compactMode,
+  onToggleCompactMode,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFavorites, setShowFavorites] = useState(false);
@@ -76,9 +88,9 @@ const Header: React.FC<HeaderProps> = ({
 
   return (
     <AppBar position="static" elevation={1}>
-      <Toolbar sx={{ gap: 2 }}>
+      <Toolbar sx={{ gap: compactMode ? 1 : 2 }} variant={compactMode ? 'dense' : 'regular'}>
         {/* === 検索フィールド === */}
-        <Box sx={{ flexGrow: 1, maxWidth: 400 }}>
+        <Box sx={{ flexGrow: 1, maxWidth: compactMode ? 200 : 400 }}>
           <TextField
             size="small"
             fullWidth
@@ -145,6 +157,31 @@ const Header: React.FC<HeaderProps> = ({
           <Tooltip title="設定">
             <IconButton color="default" onClick={onSettingsOpen}>
               <SettingsIcon />
+            </IconButton>
+          </Tooltip>
+
+          {/* === 常に最前面固定トグル === */}
+          {/* 何をする部分か：メインウィンドウを常に最前面に表示するモードを切り替え */}
+          {/* なぜ必要か：他アプリの作業中も参照し続けたいユーザーのニーズに対応するため */}
+          <Tooltip title={alwaysOnTop ? '最前面固定を解除' : '常に最前面に固定'}>
+            <IconButton
+              color={alwaysOnTop ? 'primary' : 'default'}
+              onClick={onToggleAlwaysOnTop}
+              sx={{ bgcolor: alwaysOnTop ? 'rgba(33,150,243,0.12)' : 'transparent' }}
+            >
+              {alwaysOnTop ? <PushPinIcon /> : <PushPinOutlinedIcon />}
+            </IconButton>
+          </Tooltip>
+
+          {/* === コンパクトモードトグル === */}
+          {/* 何をする部分か：ウィンドウを小型化し、UIの密度を上げるモードを切り替え */}
+          {/* なぜ必要か：作業スペースを圧迫しない小さな表示形態を提供するため */}
+          <Tooltip title={compactMode ? '通常サイズに戻す' : 'コンパクトモード'}>
+            <IconButton
+              color={compactMode ? 'primary' : 'default'}
+              onClick={onToggleCompactMode}
+            >
+              {compactMode ? <NormalSizeIcon /> : <CompactIcon />}
             </IconButton>
           </Tooltip>
         </Box>

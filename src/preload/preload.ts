@@ -71,6 +71,8 @@ interface ElectronAPI {
     getVersion(): Promise<IPCResponse>;
     toggleVisibility(): Promise<IPCResponse>;
     quit(): Promise<IPCResponse>;
+    setAlwaysOnTop(enabled: boolean): Promise<IPCResponse>;
+    setCompactMode(enabled: boolean): Promise<IPCResponse>;
   };
 
   // === ショートカット制御API ===
@@ -83,12 +85,14 @@ interface ElectronAPI {
   on: {
     quickSearch(callback: () => void): void;
     navigateToSettings(callback: () => void): void;
+    splashProgress(callback: (event: unknown, data: { percent: number; label: string }) => void): void;
   };
 
   // === イベントリスナー解除 ===
   off: {
     quickSearch(): void;
     navigateToSettings(): void;
+    splashProgress(): void;
   };
 }
 
@@ -205,6 +209,12 @@ try {
       async quit() {
         return await ipcRenderer.invoke(IPC_CHANNELS.APP.QUIT);
       },
+      async setAlwaysOnTop(enabled) {
+        return await ipcRenderer.invoke(IPC_CHANNELS.APP.SET_ALWAYS_ON_TOP, enabled);
+      },
+      async setCompactMode(enabled) {
+        return await ipcRenderer.invoke(IPC_CHANNELS.APP.SET_COMPACT_MODE, enabled);
+      },
     },
 
     // === ショートカット制御の公開 ===
@@ -229,6 +239,9 @@ try {
       navigateToSettings(callback) {
         ipcRenderer.on('navigate-to-settings', callback);
       },
+      splashProgress(callback) {
+        ipcRenderer.on(IPC_CHANNELS.SPLASH.PROGRESS, callback);
+      },
     },
 
     // === イベントリスナー解除 ===
@@ -240,6 +253,9 @@ try {
       },
       navigateToSettings() {
         ipcRenderer.removeAllListeners('navigate-to-settings');
+      },
+      splashProgress() {
+        ipcRenderer.removeAllListeners(IPC_CHANNELS.SPLASH.PROGRESS);
       },
     },
   };

@@ -44,6 +44,18 @@ function App() {
   // ── 設定ダイアログ状態 ──
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
 
+  // ── 最前面固定・コンパクトモード状態 ──
+  // 何をする部分か：メインプロセス側のウィンドウ状態と同期するフラグ
+  // なぜ必要か：起動時に保存済みの設定を反映し、ヘッダーのトグルボタンと連動させるため
+  const [alwaysOnTop, setAlwaysOnTop] = useState(false);
+  // === コンパクトモードの初期値 ===
+  // 何をする部分か：メインプロセスがURLクエリ経由で渡すヒントを同期的に読み取る
+  // なぜ必要か：settings.get()（非同期）の解決を待つ間、狭いウィンドウなのに
+  //           通常レイアウトのままUIがはみ出して見える一瞬のちらつきを防ぐため
+  const [compactMode, setCompactMode] = useState(
+    () => new URLSearchParams(window.location.search).get('compact') === '1'
+  );
+
   // ── 削除確認ダイアログ状態 ──
   // 何をする部分か：スニペット・カテゴリの削除前確認を統一管理
   // なぜ必要か：破壊的操作の前に必ずユーザー確認を取るため
@@ -94,6 +106,48 @@ function App() {
       setSelectedCategoryId(categories[0].id);
     }
   }, [categories]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // === 最前面固定・コンパクトモードの初期値読み込み ===
+  // 何をする部分か：起動時に保存済み設定を取得してトグルボタンの初期状態に反映
+  // なぜ必要か：前回終了時のモードを次回起動時にも維持するため
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await window.electronAPI.settings.get();
+        if (res.success) {
+          const s = res.data as { alwaysOnTop?: boolean; compactMode?: boolean };
+          setAlwaysOnTop(!!s.alwaysOnTop);
+          setCompactMode(!!s.compactMode);
+        }
+      } catch (err) {
+        console.error('起動時モード設定の読み込みに失敗:', err);
+      }
+    })();
+  }, []);
+
+  // === 常に最前面固定モードの切り替え ===
+  const handleToggleAlwaysOnTop = useCallback(async () => {
+    const next = !alwaysOnTop;
+    setAlwaysOnTop(next);
+    try {
+      await window.electronAPI.app.setAlwaysOnTop(next);
+    } catch (err) {
+      console.error('最前面固定モード切り替えに失敗:', err);
+      setAlwaysOnTop(!next);
+    }
+  }, [alwaysOnTop]);
+
+  // === コンパクトモードの切り替え ===
+  const handleToggleCompactMode = useCallback(async () => {
+    const next = !compactMode;
+    setCompactMode(next);
+    try {
+      await window.electronAPI.app.setCompactMode(next);
+    } catch (err) {
+      console.error('コンパクトモード切り替えに失敗:', err);
+      setCompactMode(!next);
+    }
+  }, [compactMode]);
 
   // === Material-UI テーマ生成 ===
   const muiTheme = createTheme({
@@ -311,6 +365,10 @@ function App() {
           onSettingsOpen={() => setSettingsDialogOpen(true)}
           darkMode={darkMode}
           isLoading={isLoading}
+          alwaysOnTop={alwaysOnTop}
+          onToggleAlwaysOnTop={handleToggleAlwaysOnTop}
+          compactMode={compactMode}
+          onToggleCompactMode={handleToggleCompactMode}
         />
 
         {/* === エラー表示 === */}
@@ -329,10 +387,11 @@ function App() {
             onCategoryEdit={handleOpenEditCategory}
             onCategoryDelete={handleCategoryDeleteRequest}
             onCategoryUpdate={handleDataRefresh}
+            compact={compactMode}
           />
 
           {/* === スニペット一覧 === */}
-          <Container maxWidth="lg" sx={{ flex: 1, py: 2, overflow: 'auto' }}>
+          <Container maxWidth={compactMode ? false : 'lg'} sx={{ flex: 1, py: compactMode ? 1 : 2, overflow: 'auto' }}>
             <SnippetList
               snippets={snippets}
               loading={snippetsLoading}
@@ -346,6 +405,7 @@ function App() {
               onTagClick={handleTagClick}
               activeTagFilter={searchFilters.tags?.[0]}
               onClearTagFilter={handleClearTagFilter}
+              compact={compactMode}
             />
           </Container>
         </Box>

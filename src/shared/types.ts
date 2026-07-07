@@ -116,12 +116,15 @@ export interface AppSettings {
   windowHeight: number; // ウィンドウ高さ
   windowX?: number; // ウィンドウX座標
   windowY?: number; // ウィンドウY座標
-  
+  isMaximized?: boolean; // 前回終了時にウィンドウが最大化されていたか
+
   // === 機能設定 ===
   autoStart: boolean; // OS起動時の自動開始
   minimizeToTray: boolean; // トレイへの最小化
   showNotifications: boolean; // 通知表示の有効/無効
   maxRecentItems: number; // 最近使用したスニペットの表示数
+  alwaysOnTop: boolean; // 常に最前面に表示するモード
+  compactMode: boolean; // コンパクト（小さい画面）モード
 }
 
 /**
@@ -179,13 +182,22 @@ export const IPC_CHANNELS = {
     QUIT: 'app:quit',
     GET_VERSION: 'app:get-version',
     TOGGLE_VISIBILITY: 'app:toggle-visibility',
+    SET_ALWAYS_ON_TOP: 'app:set-always-on-top', // 常に最前面固定モードの切り替え
+    SET_COMPACT_MODE: 'app:set-compact-mode', // コンパクトモードの切り替え
   },
-  
+
   // === システム関連 ===
   SYSTEM: {
     GET_CLIPBOARD: 'system:get-clipboard',
     SET_CLIPBOARD: 'system:set-clipboard',
     SHOW_NOTIFICATION: 'system:show-notification',
+  },
+
+  // === スプラッシュ画面 ===
+  // 何をする部分か：起動中の進捗（％表示）をスプラッシュウィンドウへ通知するチャンネル
+  // なぜ必要か：起動処理の体感速度を改善するため
+  SPLASH: {
+    PROGRESS: 'splash:progress',
   },
 } as const;
 
