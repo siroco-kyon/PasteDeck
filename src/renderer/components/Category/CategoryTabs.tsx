@@ -56,6 +56,7 @@ interface CategoryTabsProps {
   onCategoryEdit: (category: Category) => void;
   onCategoryDelete: (category: Category) => void;
   onCategoryUpdate: () => void;
+  compact?: boolean; // コンパクトモード時はラベルを省略しアイコンのみ表示
 }
 
 const CategoryTabs: React.FC<CategoryTabsProps> = ({
@@ -66,6 +67,7 @@ const CategoryTabs: React.FC<CategoryTabsProps> = ({
   onCategoryEdit,
   onCategoryDelete,
   onCategoryUpdate,
+  compact = false,
 }) => {
   const currentTabValue = selectedCategoryId === null ? 'all' : selectedCategoryId;
 
@@ -169,9 +171,11 @@ const CategoryTabs: React.FC<CategoryTabsProps> = ({
           variant="scrollable"
           scrollButtons="auto"
           sx={{
-            minHeight: 48,
+            minHeight: compact ? 36 : 48,
             '& .MuiTab-root': {
-              minHeight: 48,
+              minHeight: compact ? 36 : 48,
+              minWidth: compact ? 0 : undefined,
+              padding: compact ? '6px 10px' : undefined,
               textTransform: 'none',
               fontSize: '0.875rem',
             },
@@ -179,7 +183,7 @@ const CategoryTabs: React.FC<CategoryTabsProps> = ({
         >
           {/* === 「すべて」タブ === */}
           <Tab
-            label="すべて"
+            label={compact ? undefined : 'すべて'}
             value="all"
             icon={<FolderIcon fontSize="small" />}
             iconPosition="start"
@@ -191,7 +195,7 @@ const CategoryTabs: React.FC<CategoryTabsProps> = ({
           {categories.map(category => (
             <Tab
               key={category.id}
-              label={getCategoryLabel(category)}
+              label={compact ? undefined : getCategoryLabel(category)}
               value={category.id}
               icon={getCategoryIcon(category)}
               iconPosition="start"

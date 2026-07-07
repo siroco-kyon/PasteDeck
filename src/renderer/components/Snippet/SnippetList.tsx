@@ -42,6 +42,7 @@ interface SnippetListProps {
   onTagClick?: (tag: string) => void;
   activeTagFilter?: string;   // 現在適用中のタグフィルター
   onClearTagFilter?: () => void; // タグフィルター解除
+  compact?: boolean; // コンパクトモード時はカードの余白・フォントを詰める
 }
 
 const SnippetList: React.FC<SnippetListProps> = ({
@@ -57,6 +58,7 @@ const SnippetList: React.FC<SnippetListProps> = ({
   onTagClick,
   activeTagFilter,
   onClearTagFilter,
+  compact = false,
 }) => {
   // === 表示モード管理 ===
   // 何をする部分か：グリッド表示とDnD対応リスト表示を切り替え
@@ -238,9 +240,9 @@ const SnippetList: React.FC<SnippetListProps> = ({
 
       {/* === グリッド表示 === */}
       {viewMode === 'grid' && (
-        <Grid container spacing={2}>
+        <Grid container spacing={compact ? 1 : 2}>
           {displaySnippets.map(snippet => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={snippet.id}>
+            <Grid item xs={12} sm={compact ? 12 : 6} md={compact ? 6 : 4} lg={compact ? 6 : 3} key={snippet.id}>
               <SnippetCard
                 snippet={snippet}
                 onSelect={() => onSnippetSelect(snippet)}
@@ -249,6 +251,7 @@ const SnippetList: React.FC<SnippetListProps> = ({
                 onDuplicate={() => onSnippetDuplicate(snippet)}
                 onFavoriteToggle={onDataChange}
                 onTagClick={onTagClick}
+                compact={compact}
               />
             </Grid>
           ))}
@@ -265,7 +268,7 @@ const SnippetList: React.FC<SnippetListProps> = ({
               <Box
                 ref={provided.innerRef}
                 {...provided.droppableProps}
-                sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}
+                sx={{ display: 'flex', flexDirection: 'column', gap: compact ? 0.75 : 1.5 }}
               >
                 {displaySnippets.map((snippet, index) => (
                   <Draggable
@@ -288,6 +291,7 @@ const SnippetList: React.FC<SnippetListProps> = ({
                           onTagClick={onTagClick}
                           dragHandleProps={provided.dragHandleProps || undefined}
                           isDragging={snapshot.isDragging}
+                          compact={compact}
                         />
                       </Box>
                     )}

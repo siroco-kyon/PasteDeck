@@ -1,10 +1,11 @@
-import { ipcMain, clipboard, Notification, globalShortcut } from 'electron';
+import { ipcMain, clipboard, Notification, globalShortcut, BrowserWindow } from 'electron';
 import log from 'electron-log';
 import { CategoryOperations, SnippetOperations } from '../db/operations';
 import { JsonCategoryOperations, JsonSnippetOperations } from '../db/jsonStorage';
-import { getDatabase } from '../db/schema';
+import { getDatabase, getSettingValue, setSettingValue } from '../db/schema';
 import { IPC_CHANNELS } from '../../shared/types';
 import { registerCustomShortcut } from '../shortcuts/shortcutManager';
+import { NORMAL_WINDOW_SIZE, NORMAL_WINDOW_MIN_SIZE, COMPACT_WINDOW_SIZE } from '../window/windowConstants';
 import type {
   IPCResponse,
   CreateSnippetInput,
@@ -25,11 +26,25 @@ const DEFAULT_SETTINGS = {
   globalShortcut: 'Ctrl+Shift+V',
   quickSearchShortcut: 'Ctrl+Shift+Q',
   theme: 'auto' as const,
+  windowWidth: NORMAL_WINDOW_SIZE.width,
+  windowHeight: NORMAL_WINDOW_SIZE.height,
   autoStart: false,
   minimizeToTray: true,
   showNotifications: true,
   maxRecentItems: 10,
+  alwaysOnTop: false,
+  compactMode: false,
 };
+
+/**
+ * スプラッシュウィンドウを除いた「メインウィンドウ」の取得
+ * 何をする部分か：起動中はスプラッシュウィンドウとメインウィンドウが一時的に共存するため、
+ *               単純な BrowserWindow.getAllWindows()[0] だと稀にスプラッシュを掴んでしまう
+ * なぜ必要か：最前面固定・コンパクトモード・ショートカット等の操作を確実にメインウィンドウへ適用するため
+ */
+function getMainAppWindow(): BrowserWindow | undefined {
+  return BrowserWindow.getAllWindows().find(win => !(win as unknown as { isSplash?: boolean }).isSplash);
+}
 
 /**
  * 全IPCハンドラーのセットアップ
@@ -364,7 +379,7 @@ function setupSystemHandlers(): void {
  * アプリ制御関連IPCハンドラーの設定
  */
 function setupAppHandlers(): void {
-  const { app, BrowserWindow } = require('electron');
+  const { app } = require('electron');
 
   // === アプリバージョン取得 ===
   ipcMain.handle(IPC_CHANNELS.APP.GET_VERSION, async (): Promise<IPCResponse> => {
@@ -380,7 +395,7 @@ function setupAppHandlers(): void {
   // === ウィンドウ表示切り替え ===
   ipcMain.handle(IPC_CHANNELS.APP.TOGGLE_VISIBILITY, async (): Promise<IPCResponse> => {
     try {
-      const mainWindow = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+      const mainWindow = BrowserWindow.getFocusedWindow() || getMainAppWindow();
       if (!mainWindow) {
         return { success: false, message: 'メインウィンドウが見つかりません' };
       }
@@ -408,6 +423,91 @@ function setupAppHandlers(): void {
       return { success: false, message: 'アプリ終了に失敗しました', details: error };
     }
   });
+
+  // === 常に最前面固定モードの切り替え ===
+  // 何をする部分か：メインウィンドウのalwaysOnTopを切り替えて設定に保存
+  // なぜ必要か：作業中の別ウィンドウの上に常に表示しておきたいユーザー向けの機能のため
+  ipcMain.handle(
+    IPC_CHANNELS.APP.SET_ALWAYS_ON_TOP,
+    async (_, enabled: boolean): Promise<IPCResponse> => {
+      try {
+        // === 入力バリデーション ===
+        // 何をする部分か：レンダラーから渡された値が真偽値であることを確認
+        // なぜ必要か：不正な値がそのままウィンドウ操作・設定保存に使われるのを防ぐため
+        if (typeof enabled !== 'boolean') {
+          return { success: false, message: 'enabledはboolean型である必要があります', code: 'VALIDATION_ERROR' };
+        }
+
+        const mainWindow = getMainAppWindow();
+        if (mainWindow) {
+          mainWindow.setAlwaysOnTop(enabled);
+        }
+        setSettingValue('alwaysOnTop', enabled);
+        return { success: true, data: enabled };
+      } catch (error) {
+        log.error('最前面固定モード切り替えでエラーが発生:', error);
+        return { success: false, message: '最前面固定モードの切り替えに失敗しました', details: error };
+      }
+    }
+  );
+
+  // === コンパクトモードの切り替え ===
+  // 何をする部分か：ウィンドウを小型サイズにリサイズし、元のサイズを退避/復元する
+  // なぜ必要か：作業スペースを圧迫しない小さな表示モードを提供するため
+  ipcMain.handle(
+    IPC_CHANNELS.APP.SET_COMPACT_MODE,
+    async (_, enabled: boolean): Promise<IPCResponse> => {
+      try {
+        if (typeof enabled !== 'boolean') {
+          return { success: false, message: 'enabledはboolean型である必要があります', code: 'VALIDATION_ERROR' };
+        }
+
+        // === 二重トグルの防止 ===
+        // 何をする部分か：既に同じ状態になっている場合は何もしない
+        // なぜ必要か：連打等で切り替えが多重発火すると、コンパクト化前サイズの退避が
+        //           コンパクトサイズ自体で上書きされ、元のサイズが失われるため
+        const currentCompactMode = getSettingValue('compactMode', false);
+        if (currentCompactMode === enabled) {
+          return { success: true, data: enabled };
+        }
+
+        const mainWindow = getMainAppWindow();
+        if (mainWindow) {
+          if (enabled) {
+            // === 通常サイズの退避 ===
+            // 何をする部分か：コンパクト化前のウィンドウサイズを記憶
+            // なぜ必要か：解除時に元のサイズへ戻すため
+            const bounds = mainWindow.getBounds();
+            setSettingValue('preCompactBounds', { width: bounds.width, height: bounds.height });
+
+            mainWindow.setMinimumSize(COMPACT_WINDOW_SIZE.minWidth, COMPACT_WINDOW_SIZE.minHeight);
+            mainWindow.setSize(COMPACT_WINDOW_SIZE.width, COMPACT_WINDOW_SIZE.height);
+          } else {
+            // === 退避しておいた通常サイズを復元 ===
+            // 何をする部分か：新設のgetSettingValueヘルパーで退避サイズを取得
+            // なぜ必要か：生クエリを重複実装せず、エラー処理を一箇所に集約するため
+            const savedBounds = getSettingValue<{ width: number; height: number } | null>('preCompactBounds', null);
+            const targetWidth =
+              savedBounds && typeof savedBounds.width === 'number' ? savedBounds.width : NORMAL_WINDOW_SIZE.width;
+            const targetHeight =
+              savedBounds && typeof savedBounds.height === 'number' ? savedBounds.height : NORMAL_WINDOW_SIZE.height;
+
+            // === リサイズを先に行い、最小サイズは後で引き上げる ===
+            // 何をする部分か：setMinimumSizeを先に呼ぶと現在の縮小サイズが新しい最小値未満のため
+            //               即座に強制リサイズされ、直後のsetSizeと合わせて二重にリサイズされてしまう
+            // なぜ必要か：目的のサイズへ一度で遷移させ、見た目のガタつきを防ぐため
+            mainWindow.setSize(targetWidth, targetHeight);
+            mainWindow.setMinimumSize(NORMAL_WINDOW_MIN_SIZE.minWidth, NORMAL_WINDOW_MIN_SIZE.minHeight);
+          }
+        }
+        setSettingValue('compactMode', enabled);
+        return { success: true, data: enabled };
+      } catch (error) {
+        log.error('コンパクトモード切り替えでエラーが発生:', error);
+        return { success: false, message: 'コンパクトモードの切り替えに失敗しました', details: error };
+      }
+    }
+  );
 }
 
 /**
@@ -650,8 +750,6 @@ async function replacePlaceholders(content: string): Promise<string> {
  * なぜ必要か：設定画面からショートカットをOFFにできるようにするため
  */
 function setupShortcutHandlers(): void {
-  const { BrowserWindow } = require('electron');
-
   // === ショートカット有効/無効の切り替え ===
   ipcMain.handle(
     IPC_CHANNELS.SHORTCUTS.SET_ENABLED,
@@ -664,7 +762,7 @@ function setupShortcutHandlers(): void {
           // === ショートカット有効化 ===
           // 何をする部分か：設定されたキーでショートカットを再登録
           // なぜ必要か：ユーザーが有効に戻した際に即座に反映するため
-          const mainWindow = BrowserWindow.getAllWindows()[0];
+          const mainWindow = getMainAppWindow();
           if (!mainWindow) {
             return { success: false, message: 'ウィンドウが見つかりません' };
           }

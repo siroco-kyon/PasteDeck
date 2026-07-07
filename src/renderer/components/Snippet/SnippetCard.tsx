@@ -39,6 +39,7 @@ interface SnippetCardProps {
   onTagClick?: (tag: string) => void; // タグクリックでフィルタリング
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>; // DnD用ドラッグハンドル
   isDragging?: boolean;              // DnD中のスタイル制御
+  compact?: boolean;                 // コンパクトモード時は余白・フォントを詰める
 }
 
 const SnippetCard: React.FC<SnippetCardProps> = ({
@@ -51,6 +52,7 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
   onTagClick,
   dragHandleProps,
   isDragging,
+  compact = false,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -180,14 +182,14 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
         </Box>
       )}
 
-      <CardContent sx={{ flexGrow: 1, pb: 1, pl: dragHandleProps ? 4 : 2 }}>
+      <CardContent sx={{ flexGrow: 1, pb: compact ? 0.5 : 1, pl: dragHandleProps ? 4 : (compact ? 1.5 : 2), pt: compact ? 1 : undefined }}>
         {/* === タイトル行 === */}
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: compact ? 0.5 : 1 }}>
           <Box sx={{ mr: 1, mt: 0.5, flexShrink: 0 }}>
             {getContentTypeIcon()}
           </Box>
           <Typography
-            variant="subtitle1"
+            variant={compact ? 'body2' : 'subtitle1'}
             component="h3"
             sx={{
               flexGrow: 1,
@@ -196,7 +198,7 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               display: '-webkit-box',
-              WebkitLineClamp: 2,
+              WebkitLineClamp: compact ? 1 : 2,
               WebkitBoxOrient: 'vertical',
             }}
           >
@@ -214,11 +216,11 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
           variant="body2"
           color="text.secondary"
           sx={{
-            mb: isLongContent ? 0.5 : 1.5,
+            mb: isLongContent ? 0.5 : (compact ? 0.75 : 1.5),
             fontFamily: 'monospace',
-            fontSize: '0.75rem',
+            fontSize: compact ? '0.68rem' : '0.75rem',
             backgroundColor: 'action.hover',
-            padding: 1,
+            padding: compact ? 0.5 : 1,
             borderRadius: 1,
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-all',
@@ -226,9 +228,9 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               display: '-webkit-box',
-              WebkitLineClamp: 3,
+              WebkitLineClamp: compact ? 2 : 3,
               WebkitBoxOrient: 'vertical',
-              minHeight: '3.6em',
+              minHeight: compact ? '2.4em' : '3.6em',
             }),
           }}
         >
@@ -265,7 +267,7 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
         {/* なぜ必要か：タグベースの素早いフィルタリングを可能にするため */}
         {snippet.tags.length > 0 && (
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-            {snippet.tags.slice(0, 3).map(tag => (
+            {snippet.tags.slice(0, compact ? 1 : 3).map(tag => (
               <Chip
                 key={tag}
                 label={tag}
@@ -274,18 +276,18 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
                 onClick={onTagClick ? e => handleTagClick(e, tag) : undefined}
                 sx={{
                   fontSize: '0.7rem',
-                  height: 20,
+                  height: compact ? 18 : 20,
                   cursor: onTagClick ? 'pointer' : 'default',
                   '&:hover': onTagClick ? { bgcolor: 'primary.light', borderColor: 'primary.main' } : {},
                 }}
               />
             ))}
-            {snippet.tags.length > 3 && (
+            {snippet.tags.length > (compact ? 1 : 3) && (
               <Chip
-                label={`+${snippet.tags.length - 3}`}
+                label={`+${snippet.tags.length - (compact ? 1 : 3)}`}
                 size="small"
                 variant="outlined"
-                sx={{ fontSize: '0.7rem', height: 20, opacity: 0.7 }}
+                sx={{ fontSize: '0.7rem', height: compact ? 18 : 20, opacity: 0.7 }}
               />
             )}
           </Box>
@@ -293,7 +295,7 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
       </CardContent>
 
       {/* === フッター操作ボタン群 === */}
-      <CardActions sx={{ px: 2, pb: 1.5, pt: 0, justifyContent: 'space-between' }}>
+      <CardActions sx={{ px: compact ? 1 : 2, pb: compact ? 0.75 : 1.5, pt: 0, justifyContent: 'space-between' }}>
         {/* === 使用回数表示（頻度により色分け） === */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           {snippet.useCount > 0 && (

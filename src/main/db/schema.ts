@@ -294,6 +294,44 @@ export function getDatabase(): Database.Database {
 }
 
 /**
+ * 設定値の取得（settingsテーブルから直接読み込み）
+ * 何をする部分か：レンダラーのIPCを経由せず、メインプロセス内から直接設定値を読む
+ * なぜ必要か：ウィンドウ生成前（レンダラーが存在しない時点）に
+ *           前回のウィンドウ位置・サイズ等を復元する必要があるため
+ * @param key 設定キー
+ * @param defaultValue DB未初期化・未設定・エラー時に返すデフォルト値
+ */
+export function getSettingValue<T>(key: string, defaultValue: T): T {
+  try {
+    const row = getDatabase()
+      .prepare('SELECT value FROM settings WHERE key = ?')
+      .get(key) as { value: string } | undefined;
+    if (!row) return defaultValue;
+    return JSON.parse(row.value) as T;
+  } catch (error) {
+    log.warn(`設定値取得に失敗（デフォルト値を使用）: ${key}`, String(error));
+    return defaultValue;
+  }
+}
+
+/**
+ * 設定値の保存（settingsテーブルへ直接書き込み）
+ * 何をする部分か：getSettingValueと対になる書き込みヘルパー。IPC不要でメインプロセス内から直接保存する
+ * なぜ必要か：ウィンドウのリサイズ・移動などレンダラーを介さないイベントから設定を永続化するため
+ * @param key 設定キー
+ * @param value 保存する値（JSON化して保存）
+ */
+export function setSettingValue(key: string, value: unknown): void {
+  try {
+    getDatabase()
+      .prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
+      .run(key, JSON.stringify(value));
+  } catch (error) {
+    log.warn(`設定値保存に失敗: ${key}`, String(error));
+  }
+}
+
+/**
  * データベース接続クローズ
  * アプリ終了時に呼び出してリソースを解放
  */
