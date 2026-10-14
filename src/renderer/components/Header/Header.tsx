@@ -28,6 +28,7 @@ import {
 // なぜ必要か：主要な操作への素早いアクセスと統一された操作体験のため
 
 interface HeaderProps {
+  searchQuery: string; // 検索欄の入力値（タブ切り替え時に App 側からクリアできるよう親で管理）
   onSearch: (query: string) => void;
   onFavoriteToggle: (showFavorites: boolean) => void;
   onThemeToggle: () => void;
@@ -42,6 +43,7 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({
+  searchQuery,
   onSearch,
   onFavoriteToggle,
   onThemeToggle,
@@ -54,20 +56,16 @@ const Header: React.FC<HeaderProps> = ({
   compactMode,
   onToggleCompactMode,
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
   const [showFavorites, setShowFavorites] = useState(false);
 
   // === 検索入力ハンドリング ===
   // 何をする部分か：入力と同時にリアルタイム検索を実行
   // なぜ必要か：素早いフィルタリングでユーザビリティを向上させるため
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setSearchQuery(value);
-    onSearch(value);
+    onSearch(e.target.value);
   };
 
   const handleSearchClear = () => {
-    setSearchQuery('');
     onSearch('');
   };
 

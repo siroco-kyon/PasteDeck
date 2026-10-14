@@ -23,7 +23,7 @@ import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
-import type { Snippet } from '@/shared/types';
+import type { Snippet, Category } from '@/shared/types';
 
 // === スニペットカードコンポーネント ===
 // 何をする部分か：個々のスニペットを表示・操作するカードUI
@@ -39,6 +39,7 @@ interface SnippetCardProps {
   onTagClick?: (tag: string) => void; // タグクリックでフィルタリング
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>; // DnD用ドラッグハンドル
   isDragging?: boolean;              // DnD中のスタイル制御
+  category?: Category;               // 所属カテゴリ（全カテゴリ検索中のみ渡され、カード上部に表示）
 }
 
 const SnippetCard: React.FC<SnippetCardProps> = ({
@@ -51,6 +52,7 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
   onTagClick,
   dragHandleProps,
   isDragging,
+  category,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -181,6 +183,26 @@ const SnippetCard: React.FC<SnippetCardProps> = ({
       )}
 
       <CardContent sx={{ flexGrow: 1, pb: 1, pl: dragHandleProps ? 4 : 2 }}>
+        {/* === 所属カテゴリ表示 === */}
+        {/* 何をする部分か：全カテゴリ検索中だけ、カテゴリ名をカラードット付きで表示 */}
+        {/* なぜ必要か：検索結果には複数カテゴリのスニペットが混ざるため、どこにあるものか分かるようにするため */}
+        {category && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.75, minWidth: 0 }}>
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                bgcolor: category.color || 'text.disabled',
+                flexShrink: 0,
+              }}
+            />
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {category.name}
+            </Typography>
+          </Box>
+        )}
+
         {/* === タイトル行 === */}
         <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1 }}>
           <Box sx={{ mr: 1, mt: 0.5, flexShrink: 0 }}>

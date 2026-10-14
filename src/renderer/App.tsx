@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Box, Container, Alert, Snackbar } from '@mui/material';
@@ -14,7 +14,7 @@ import { useCategories } from './hooks/useCategories';
 import { useSnippets } from './hooks/useSnippets';
 import { useTheme } from './hooks/useTheme';
 import { useElectronEvents } from './hooks/useElectronEvents';
-import type { Snippet, Category, SearchFilters } from '@/shared/types';
+import type { Snippet, Category, SearchFilters, AppSettings } from '@/shared/types';
 
 // === メインアプリケーションコンポーネント ===
 // 何をする部分か：アプリケーション全体のレイアウト・状態管理・ダイアログ制御を統括
@@ -22,8 +22,35 @@ import type { Snippet, Category, SearchFilters } from '@/shared/types';
 
 function App() {
   // === 検索・カテゴリフィルター状態 ===
+  // 何をする部分か：選択中のタブ、検索欄の入力値、検索・お気に入り条件を管理
+  // なぜ必要か：一覧の絞り込み条件を組み立てる元になるため
+  // Note: カテゴリの絞り込みは searchFilters に持たせず、selectedCategoryId だけを状態とする。
+  //       両方に持つと片方だけ更新されたときにタブと一覧の内容がずれるため（snippetFilters で合成）
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
-  const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
+  const [searchText, setSearchText] = useState('');
+  const [searchFilters, setSearchFilters] = useState<Omit<SearchFilters, 'categoryId'>>({});
+
+  // === 前回タブの復元状態 ===
+  // 何をする部分か：保存済みの前回タブ（settings の lastCategoryId）と、復元が済んだかを管理
+  // なぜ必要か：設定とカテゴリ一覧の両方が揃ってから初期タブを決め、それまでは一覧を
+  //           取得しないことで、起動直後に別タブの内容が一瞬表示されるのを防ぐため
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [initialSelectionDone, setInitialSelectionDone] = useState(false);
+  const savedCategoryIdRef = useRef<number | null | undefined>(undefined);
+
+  // === 一覧の絞り込み条件 ===
+  // 何をする部分か：キーワード・タグで検索中は全カテゴリを対象にし、
+  //               それ以外は選択中のタブで絞り込んだ条件を作る
+  // なぜ必要か：目的のスニペットが別タブにあっても検索で見つけられるようにするため
+  //           （useMemo で参照を安定させ、useSnippets の再取得が無限に走らないようにする）
+  const isSearching = !!searchFilters.query || !!searchFilters.tags?.length;
+  const snippetFilters = useMemo<SearchFilters>(
+    () => ({
+      ...searchFilters,
+      categoryId: isSearching ? undefined : selectedCategoryId ?? undefined,
+    }),
+    [searchFilters, selectedCategoryId, isSearching]
+  );
 
   // === 通知スナックバー状態 ===
   const [notification, setNotification] = useState<{
@@ -72,8 +99,13 @@ function App() {
   // === カスタムフック ===
   const { categories, loading: categoriesLoading, error: categoriesError, refetch: refetchCategories } =
     useCategories();
-  const { snippets, loading: snippetsLoading, error: snippetsError, refetch: refetchSnippets } =
-    useSnippets(searchFilters);
+  const {
+    snippets,
+    loading: snippetsLoading,
+    error: snippetsError,
+    refetch: refetchSnippets,
+    copyToClipboard: copySnippetToClipboard,
+  } = useSnippets(snippetFilters, { enabled: initialSelectionDone });
   const { theme, darkMode, toggleDarkMode, setTheme } = useTheme();
 
   // === Electronイベントハンドラー ===
@@ -98,33 +130,75 @@ function App() {
     onNavigateToSettings: handleNavigateToSettings,
   });
 
-  // === 初期カテゴリ自動選択 ===
-  // 何をする部分か：カテゴリ読み込み後、未選択状態なら先頭カテゴリを自動選択
-  // なぜ必要か：起動直後にスニペットが表示される状態にするため
-  // selectedCategoryId を依存配列に含めないことで、手動選択後の再実行を防ぐ
-  useEffect(() => {
-    if (categories.length > 0 && selectedCategoryId === null) {
-      setSelectedCategoryId(categories[0].id);
-    }
-  }, [categories]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // === 最前面固定・コンパクトモードの初期値読み込み ===
-  // 何をする部分か：起動時に保存済み設定を取得してトグルボタンの初期状態に反映
-  // なぜ必要か：前回終了時のモードを次回起動時にも維持するため
+  // === 保存済み設定の読み込み ===
+  // 何をする部分か：起動時に保存済み設定を取得し、トグルボタンの初期状態と前回タブを読み込む
+  // なぜ必要か：前回終了時のモードとタブを次回起動時にも維持するため
   useEffect(() => {
     (async () => {
       try {
         const res = await window.electronAPI.settings.get();
         if (res.success) {
-          const s = res.data as { alwaysOnTop?: boolean; compactMode?: boolean };
+          const s = res.data as Partial<AppSettings>;
           setAlwaysOnTop(!!s.alwaysOnTop);
           setCompactMode(!!s.compactMode);
+          // 数値か null（「すべて」）以外は壊れた値とみなし、未保存扱いにする
+          savedCategoryIdRef.current =
+            typeof s.lastCategoryId === 'number' || s.lastCategoryId === null
+              ? s.lastCategoryId
+              : undefined;
         }
       } catch (err) {
         console.error('起動時モード設定の読み込みに失敗:', err);
+      } finally {
+        // 失敗しても初期タブの決定に進めるよう、読み込み完了扱いにする
+        setSettingsLoaded(true);
       }
     })();
   }, []);
+
+  // === 初期タブの決定（前回タブの復元） ===
+  // 何をする部分か：設定とカテゴリ一覧が揃った時点で一度だけ初期タブを決める
+  //   - 前回タブが保存されていて、まだ存在する → そのタブ
+  //   - 前回が「すべて」、または前回のカテゴリが削除済み → 「すべて」
+  //   - 一度も保存されていない（初回起動） → 先頭カテゴリ
+  // なぜ必要か：起動のたびに先頭タブへ戻されず、前回の続きから使えるようにするため
+  useEffect(() => {
+    if (initialSelectionDone || categoriesLoading || !settingsLoaded) return;
+
+    const saved = savedCategoryIdRef.current;
+    let initialCategoryId: number | null;
+    if (saved === undefined) {
+      initialCategoryId = categories[0]?.id ?? null;
+    } else if (saved !== null && categories.some(c => c.id === saved)) {
+      initialCategoryId = saved;
+    } else {
+      initialCategoryId = null;
+    }
+
+    setSelectedCategoryId(initialCategoryId);
+    setInitialSelectionDone(true);
+  }, [categories, categoriesLoading, settingsLoaded, initialSelectionDone]);
+
+  // === 選択中カテゴリの存在チェック ===
+  // 何をする部分か：選択中のカテゴリが一覧から消えたら「すべて」に切り替える
+  // なぜ必要か：カテゴリ削除やデータインポートの後、存在しないタブで絞り込んだまま
+  //           空の一覧が表示され続けるのを防ぐため
+  useEffect(() => {
+    if (!initialSelectionDone || categoriesLoading) return;
+    if (selectedCategoryId !== null && !categories.some(c => c.id === selectedCategoryId)) {
+      setSelectedCategoryId(null);
+    }
+  }, [categories, categoriesLoading, selectedCategoryId, initialSelectionDone]);
+
+  // === 選択中タブの保存 ===
+  // 何をする部分か：タブが変わるたびに lastCategoryId として設定に保存する
+  // なぜ必要か：次回起動時に同じタブを復元するため
+  useEffect(() => {
+    if (!initialSelectionDone) return;
+    window.electronAPI.settings.set('lastCategoryId', selectedCategoryId).catch(err => {
+      console.error('選択中タブの保存に失敗:', err);
+    });
+  }, [selectedCategoryId, initialSelectionDone]);
 
   // === 常に最前面固定モードの切り替え ===
   const handleToggleAlwaysOnTop = useCallback(async () => {
@@ -176,6 +250,7 @@ function App() {
   // 検索・フィルター
   // ─────────────────────────────────
   const handleSearch = (query: string) => {
+    setSearchText(query);
     const trimmed = query.trim();
     setSearchFilters(prev => ({
       ...prev,
@@ -185,9 +260,16 @@ function App() {
     }));
   };
 
+  // === タブ選択 ===
+  // 何をする部分か：選択タブを切り替え、検索中だった場合は検索も解除する
+  // なぜ必要か：検索中は全カテゴリが対象でタブの選択が効かないため、タブを押したら
+  //           そのタブの一覧に戻るのが自然な動きになるため
   const handleCategorySelect = (categoryId: number | null) => {
     setSelectedCategoryId(categoryId);
-    setSearchFilters(prev => ({ ...prev, categoryId: categoryId ?? undefined }));
+    if (isSearching) {
+      setSearchText('');
+      setSearchFilters(prev => ({ ...prev, query: undefined, tags: undefined }));
+    }
   };
 
   const handleFavoriteToggle = (showFavorites: boolean) => {
@@ -207,17 +289,15 @@ function App() {
   // ─────────────────────────────────
 
   // コピー
+  // 何をする部分か：クリップボードへコピーし、使用回数は手元の一覧だけ更新する
+  // なぜ必要か：コピーのたびに全件を取り直すと一覧が描き直され、点滅したり
+  //           スクロール位置が先頭に戻ったりするため
   const handleSnippetSelect = async (snippet: Snippet) => {
-    try {
-      const result = await window.electronAPI.snippet.copyToClipboard(snippet.id);
-      if (result.success) {
-        showNotification(`"${snippet.title}" をコピーしました`, 'success');
-        await refetchSnippets();
-      } else {
-        showNotification('コピーに失敗しました', 'error');
-      }
-    } catch {
-      showNotification('コピー中にエラーが発生しました', 'error');
+    const copied = await copySnippetToClipboard(snippet.id);
+    if (copied) {
+      showNotification(`"${snippet.title}" をコピーしました`, 'success');
+    } else {
+      showNotification('コピーに失敗しました', 'error');
     }
   };
 
@@ -316,10 +396,9 @@ function App() {
       onConfirm: async () => {
         const result = await window.electronAPI.category.delete(category.id);
         if (result.success) {
-          // 削除したカテゴリが選択中だった場合は先頭カテゴリへ移動
+          // 削除したカテゴリが選択中だった場合は「すべて」へ移動
           if (selectedCategoryId === category.id) {
             setSelectedCategoryId(null);
-            setSearchFilters(prev => ({ ...prev, categoryId: undefined }));
           }
           showNotification('カテゴリを削除しました', 'success');
           await handleDataRefresh();
@@ -359,6 +438,7 @@ function App() {
 
         {/* === ヘッダー === */}
         <Header
+          searchQuery={searchText}
           onSearch={handleSearch}
           onFavoriteToggle={handleFavoriteToggle}
           onThemeToggle={toggleDarkMode}
@@ -389,6 +469,7 @@ function App() {
             onCategoryDelete={handleCategoryDeleteRequest}
             onCategoryUpdate={handleDataRefresh}
             compact={compactMode}
+            hideSelection={isSearching || !initialSelectionDone}
           />
 
           {/* === スニペット一覧 === */}
@@ -398,9 +479,12 @@ function App() {
             <Box sx={{ flex: 1, overflow: 'hidden' }}>
               <CompactSnippetList
                 snippets={snippets}
+                loading={snippetsLoading}
                 onSnippetSelect={handleSnippetSelect}
                 onSnippetEdit={handleOpenEditSnippet}
                 onCreateClick={handleOpenCreateSnippet}
+                searchActive={isSearching}
+                categories={categories}
               />
             </Box>
           ) : (
@@ -418,6 +502,8 @@ function App() {
                 onTagClick={handleTagClick}
                 activeTagFilter={searchFilters.tags?.[0]}
                 onClearTagFilter={handleClearTagFilter}
+                searchActive={isSearching}
+                categories={categories}
               />
             </Container>
           )}
