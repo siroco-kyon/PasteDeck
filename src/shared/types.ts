@@ -120,7 +120,7 @@ export interface AppSettings {
   lastCategoryId?: number | null; // 前回選択していたカテゴリタブ（null＝「すべて」、未保存＝undefined）
 
   // === 機能設定 ===
-  autoStart: boolean; // OS起動時の自動開始
+  autoStart: boolean; // OS起動時の自動開始（ウィンドウは出さずトレイに常駐。取得時はOSの実際の登録状態）
   minimizeToTray: boolean; // トレイへの最小化
   showNotifications: boolean; // 通知表示の有効/無効
   maxRecentItems: number; // 最近使用したスニペットの表示数

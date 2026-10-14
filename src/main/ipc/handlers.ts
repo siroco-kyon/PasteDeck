@@ -6,6 +6,7 @@ import { getDatabase, getSettingValue, setSettingValue } from '../db/schema';
 import { IPC_CHANNELS } from '../../shared/types';
 import { registerCustomShortcut } from '../shortcuts/shortcutManager';
 import { NORMAL_WINDOW_SIZE, NORMAL_WINDOW_MIN_SIZE, COMPACT_WINDOW_SIZE } from '../window/windowConstants';
+import { isAutoStartSupported, isAutoStartEnabled, setAutoStart } from '../autoStart';
 import type {
   IPCResponse,
   CreateSnippetInput,
@@ -516,6 +517,20 @@ function setupAppHandlers(): void {
  * なぜ必要か：テーマ・通知設定等のユーザー設定を永続化するため
  */
 function setupSettingsHandlers(): void {
+  // === OS側の状態を設定値に重ねる ===
+  // 何をする部分か：自動起動はDBの保存値ではなくOSの実際の登録状態で上書きし、
+  //               設定できる環境かどうか（autoStartSupported）も付け加える
+  // なぜ必要か：タスクマネージャー等で外部から解除された場合も設定画面を実態と一致させ、
+  //           開発モードや Linux では設定画面のスイッチを無効表示にするため
+  const withRuntimeSettings = (settings: Record<string, unknown>): Record<string, unknown> => {
+    const supported = isAutoStartSupported();
+    return {
+      ...settings,
+      autoStart: supported ? isAutoStartEnabled() : settings.autoStart,
+      autoStartSupported: supported,
+    };
+  };
+
   // === 設定取得 ===
   // 何をする部分か：DB から全設定を取得し、未設定キーにはデフォルト値を適用
   // なぜ必要か：常に有効な設定値を返すため
@@ -526,7 +541,7 @@ function setupSettingsHandlers(): void {
         db = getDatabase();
       } catch {
         // DB未初期化の場合はデフォルト設定を返す
-        return { success: true, data: DEFAULT_SETTINGS };
+        return { success: true, data: withRuntimeSettings(DEFAULT_SETTINGS) };
       }
 
       const rows = db.prepare('SELECT key, value FROM settings').all() as Array<{
@@ -543,7 +558,7 @@ function setupSettingsHandlers(): void {
         }
       });
 
-      return { success: true, data: settings };
+      return { success: true, data: withRuntimeSettings(settings) };
     } catch (error) {
       log.error('設定取得でエラー:', error);
       return { success: false, message: '設定取得に失敗しました', details: error };
@@ -555,6 +570,14 @@ function setupSettingsHandlers(): void {
   // なぜ必要か：設定を永続化するため
   ipcMain.handle(IPC_CHANNELS.SETTINGS.SET, async (_, key: string, value: unknown): Promise<IPCResponse> => {
     try {
+      // === 自動起動のOS反映 ===
+      // 何をする部分か：autoStart の変更時はDB保存に加えてOSのログイン項目へ登録・解除する
+      // なぜ必要か：DBに保存するだけでは次回のPC起動時に実際には起動されないため
+      if (key === 'autoStart') {
+        value = value === true; // 真偽値以外が渡されても安全側（無効）に倒す
+        setAutoStart(value as boolean);
+      }
+
       const db = getDatabase();
       db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(
         key,
@@ -575,8 +598,10 @@ function setupSettingsHandlers(): void {
     try {
       const db = getDatabase();
       db.prepare('DELETE FROM settings').run();
+      // 既定値は自動起動オフのため、OSのログイン項目からも外す
+      if (isAutoStartSupported()) setAutoStart(false);
       log.info('設定をリセットしました');
-      return { success: true, data: DEFAULT_SETTINGS };
+      return { success: true, data: withRuntimeSettings(DEFAULT_SETTINGS) };
     } catch (error) {
       log.error('設定リセットでエラー:', error);
       return { success: false, message: '設定リセットに失敗しました', details: error };

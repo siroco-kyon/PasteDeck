@@ -40,6 +40,8 @@ interface AppSettings {
   showNotifications: boolean;
   minimizeToTray: boolean;
   maxRecentItems: number;
+  autoStart: boolean;          // OS起動時にトレイ常駐で自動起動するか（OSの実際の登録状態）
+  autoStartSupported: boolean; // 自動起動を設定できる環境か（インストール版の Windows / macOS のみ）
 }
 
 interface SettingsDialogProps {
@@ -147,6 +149,25 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
       await window.electronAPI.settings.set('minimizeToTray', checked);
     } catch (err) {
       console.error('トレイ設定保存エラー:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // === 自動起動設定変更処理 ===
+  // 何をする部分か：OS起動時の自動起動（トレイ常駐）を切り替え、メインプロセス経由でOSに登録する
+  // なぜ必要か：PC起動後の初回起動の待ち時間を、ログイン時に済ませておけるようにするため
+  const handleAutoStartChange = async (checked: boolean) => {
+    if (!settings) return;
+    setSettings(prev => prev ? { ...prev, autoStart: checked } : prev);
+    setSaving(true);
+    try {
+      const res = await window.electronAPI.settings.set('autoStart', checked);
+      if (!res.success) throw new Error(res.message);
+    } catch (err) {
+      console.error('自動起動設定保存エラー:', err);
+      // 失敗時は元の状態に戻す
+      setSettings(prev => prev ? { ...prev, autoStart: !checked } : prev);
     } finally {
       setSaving(false);
     }
@@ -293,6 +314,27 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                 動作
               </Typography>
               <Stack spacing={0.5}>
+                {/* 何をする部分か：OS起動時にトレイ常駐で自動起動するかを切り替える */}
+                {/* なぜ必要か：初回起動の待ち時間をなくし、ショートカットですぐ開けるようにするため */}
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={settings?.autoStart ?? false}
+                      onChange={e => handleAutoStartChange(e.target.checked)}
+                      disabled={saving || !settings?.autoStartSupported}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2">PC起動時に自動で起動</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {settings?.autoStartSupported
+                          ? 'ウィンドウは出さずにトレイで待機し、ショートカットやトレイからすぐ開けます'
+                          : 'インストール版（Windows / macOS）でのみ設定できます'}
+                      </Typography>
+                    </Box>
+                  }
+                />
                 <FormControlLabel
                   control={
                     <Switch
