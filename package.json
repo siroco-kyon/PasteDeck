@@ -25,19 +25,17 @@
     "test": "vitest"
   },
   "dependencies": {
+    "better-sqlite3": "^12.2.0",
+    "electron-log": "^5.0.0"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.1",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "@hello-pangea/dnd": "^18.0.1",
     "@mui/icons-material": "^5.14.19",
     "@mui/material": "^5.14.20",
     "@mui/system": "^5.14.20",
-    "better-sqlite3": "^12.2.0",
-    "electron-log": "^5.0.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
-  },
-  "devDependencies": {
-    "@electron/rebuild": "^4.0.1",
     "@types/better-sqlite3": "^7.6.8",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
@@ -53,6 +51,8 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
     "png-to-ico": "^3.0.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "sharp": "^0.34.5",
     "typescript": "^5.2.2",
     "vite": "^5.0.8",
@@ -68,8 +68,14 @@
     },
     "files": [
       "dist/**/*",
-      "node_modules/**/*",
-      "package.json"
+      "package.json",
+      "!**/node_modules/better-sqlite3/{bin,deps,src}/**",
+      "!**/node_modules/better-sqlite3/build/{deps,Release/obj}/**",
+      "!**/node_modules/better-sqlite3/build/**/*.{exp,iobj,ipdb,lib,pdb,vcxproj,filters}",
+      "!**/node_modules/better-sqlite3/build/Release/test_extension.node"
+    ],
+    "asarUnpack": [
+      "**/*.node"
     ],
     "extraResources": [
       {

@@ -1,13 +1,20 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Snippet, SearchFilters, CreateSnippetInput, UpdateSnippetInput } from '@/shared/types';
 
 // === スニペット管理フック ===
 // 何をする部分か：スニペットデータのCRUD操作と検索機能を統括管理
 // なぜ必要か：複数のコンポーネントで共通するスニペット操作ロジックを再利用するため
 
+interface UseSnippetsOptions {
+  // 何をする部分か：false の間は自動取得を行わない
+  // なぜ必要か：起動時に前回のタブが確定する前に全件を取得して、
+  //           一瞬だけ別の一覧が表示されるのを防ぐため
+  enabled?: boolean;
+}
+
 interface UseSnippetsReturn {
   snippets: Snippet[];
-  loading: boolean;
+  loading: boolean; // 初回の読み込みが終わるまでだけ true（再取得中は一覧を表示したまま）
   error: string | null;
   refetch: () => Promise<void>;
   createSnippet: (input: CreateSnippetInput) => Promise<Snippet | null>;
@@ -18,10 +25,14 @@ interface UseSnippetsReturn {
 
 /**
  * スニペット管理カスタムフック
- * @param filters 検索・絞り込み条件
+ * @param filters 検索・絞り込み条件（呼び出し側で useMemo などにより参照を安定させること）
+ * @param options 自動取得の有効/無効など
  * @returns UseSnippetsReturn スニペット操作に必要な状態と関数群
  */
-export function useSnippets(filters: SearchFilters = {}): UseSnippetsReturn {
+export function useSnippets(
+  filters: SearchFilters = {},
+  { enabled = true }: UseSnippetsOptions = {}
+): UseSnippetsReturn {
   // === 状態管理 ===
   // 何をする部分か：スニペット一覧、ローディング、エラー状態を管理
   // なぜ必要か：UIの状態表示とデータフロー制御のため
@@ -29,12 +40,20 @@ export function useSnippets(filters: SearchFilters = {}): UseSnippetsReturn {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  // === 最新リクエストの識別番号 ===
+  // 何をする部分か：取得処理を呼ぶたびに番号を進め、最新でない応答を捨てる
+  // なぜ必要か：タブを素早く切り替えたとき、古いタブの応答が後から届いて
+  //           選択中のタブと違う一覧で上書きされるのを防ぐため
+  const latestRequestIdRef = useRef(0);
+
   // === スニペット検索・取得処理 ===
   // 何をする部分か：検索条件に基づいてスニペットを取得
   // なぜ必要か：カテゴリ切り替えや検索に応じたデータ表示のため
+  // Note: setLoading(true) は呼ばない。再取得のたびに一覧がスピナーに置き換わると
+  //       点滅してスクロール位置も失われるため、再取得中は直前の一覧を表示し続ける
   const fetchSnippets = useCallback(async () => {
+    const requestId = ++latestRequestIdRef.current;
     try {
-      setLoading(true);
       setError(null);
 
       // Electron APIの利用可能性をチェック
@@ -54,23 +73,30 @@ export function useSnippets(filters: SearchFilters = {}): UseSnippetsReturn {
         // 検索条件なし：全件取得APIを使用
         response = await window.electronAPI.snippet.getAll();
       }
-      
+
+      // より新しいリクエストが発行済みなら、この応答は古い条件の結果なので捨てる
+      if (requestId !== latestRequestIdRef.current) return;
+
       if (response.success) {
         setSnippets(response.data);
       } else {
         throw new Error(response.message || 'スニペット取得に失敗しました');
       }
-      
+
     } catch (err) {
+      if (requestId !== latestRequestIdRef.current) return;
+
       const errorMessage = err instanceof Error ? err.message : 'スニペット取得で不明なエラーが発生しました';
       setError(errorMessage);
       console.error('スニペット取得エラー:', err);
-      
+
       // === エラー時のフォールバック ===
       setSnippets([]);
-      
+
     } finally {
-      setLoading(false);
+      if (requestId === latestRequestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [filters]);
 
@@ -184,10 +210,10 @@ export function useSnippets(filters: SearchFilters = {}): UseSnippetsReturn {
   // === クリップボードコピー処理 ===
   // 何をする部分か：スニペット内容をクリップボードにコピーし使用統計を更新
   // なぜ必要か：スニペットの主要機能であるコピー操作の実行と統計管理のため
+  // Note: 失敗時は error 状態を立てず false を返すだけにする。結果の通知は呼び出し側の
+  //       スナックバーが担うため、画面上部にエラー表示が残り続けないようにしている
   const copyToClipboard = useCallback(async (id: number): Promise<boolean> => {
     try {
-      setError(null);
-
       const response = await window.electronAPI.snippet.copyToClipboard(id);
 
       if (response.success) {
@@ -208,19 +234,18 @@ export function useSnippets(filters: SearchFilters = {}): UseSnippetsReturn {
       }
 
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'クリップボードコピーで不明なエラーが発生しました';
-      setError(errorMessage);
       console.error('クリップボードコピーエラー:', err);
       return false;
     }
   }, []);
 
   // === フィルター条件変更時のデータ再取得 ===
-  // 何をする部分か：検索条件が変更された際の自動再取得
+  // 何をする部分か：検索条件が変更された際の自動再取得（enabled が false の間は待機）
   // なぜ必要か：フィルター変更に応じた表示内容の更新のため
   useEffect(() => {
+    if (!enabled) return;
     fetchSnippets();
-  }, [fetchSnippets]);
+  }, [fetchSnippets, enabled]);
 
   return {
     snippets,

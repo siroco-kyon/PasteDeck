@@ -334,15 +334,16 @@ export class SnippetOperations {
       }
 
       const whereSQL = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
-      
+
+      // === 並び順 ===
+      // 何をする部分か：getAll() と同じく手動の並び順（sort_order）で返す
+      // なぜ必要か：「すべて」タブとカテゴリタブで並び順のルールが違うと、
+      //           ドラッグで並べた順が反映されなかったり、コピーのたびに使用回数で
+      //           項目が入れ替わったりするため（使用回数順は一覧側のトグルで提供）
       const stmt = db.prepare(`
-        SELECT * FROM snippets 
+        SELECT * FROM snippets
         ${whereSQL}
-        ORDER BY 
-          CASE WHEN is_favorite = 1 THEN 0 ELSE 1 END,
-          use_count DESC,
-          sort_order ASC,
-          created_at DESC
+        ORDER BY sort_order ASC, created_at DESC
       `);
       
       const rows = stmt.all(...values) as any[];

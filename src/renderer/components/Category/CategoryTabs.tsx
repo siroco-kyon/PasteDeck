@@ -57,6 +57,7 @@ interface CategoryTabsProps {
   onCategoryDelete: (category: Category) => void;
   onCategoryUpdate: () => void;
   compact?: boolean; // コンパクトモード時はラベルを省略しアイコンのみ表示
+  hideSelection?: boolean; // true の間はどのタブも選択表示しない（全カテゴリ検索中・前回タブの復元前）
 }
 
 const CategoryTabs: React.FC<CategoryTabsProps> = ({
@@ -68,8 +69,15 @@ const CategoryTabs: React.FC<CategoryTabsProps> = ({
   onCategoryDelete,
   onCategoryUpdate,
   compact = false,
+  hideSelection = false,
 }) => {
-  const currentTabValue = selectedCategoryId === null ? 'all' : selectedCategoryId;
+  // === 選択表示するタブ ===
+  // 何をする部分か：hideSelection 中は false（どのタブも選択表示しない）、それ以外は選択中のタブ
+  // なぜ必要か：検索結果は全カテゴリが対象なので、特定のタブを選択表示したままだと
+  //           「タブと一覧の内容が違う」状態に見えてしまうため
+  const currentTabValue: number | 'all' | false = hideSelection
+    ? false
+    : selectedCategoryId === null ? 'all' : selectedCategoryId;
 
   // === 並び替えダイアログ状態 ===
   // 何をする部分か：カテゴリ並び替えダイアログの開閉を管理

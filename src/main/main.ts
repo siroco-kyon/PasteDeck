@@ -8,6 +8,7 @@ import { createTray } from './tray/trayManager';
 import { setupGlobalShortcuts } from './shortcuts/shortcutManager';
 import { createSplashWindow, sendSplashProgress } from './window/splashWindow';
 import { NORMAL_WINDOW_SIZE, NORMAL_WINDOW_MIN_SIZE, COMPACT_WINDOW_SIZE } from './window/windowConstants';
+import { wasLaunchedHidden } from './autoStart';
 
 // === Electronメインプロセス ===
 // 何をする部分か：アプリケーションのライフサイクルとウィンドウ管理を制御
@@ -99,9 +100,10 @@ function isBoundsVisibleOnAnyDisplay(x: number, y: number, width: number, height
  * アプリケーションのUIウィンドウを生成・設定
  * 何をする部分か：前回のウィンドウ位置・サイズ・最前面固定・コンパクトモード設定を復元しつつウィンドウを生成
  * なぜ必要か：起動のたびに同じ場所・サイズにリセットされる挙動を解消するため
+ * @param options.showWhenReady 描画準備ができたら表示するか（自動起動でトレイ常駐する場合は false）
  * @returns BrowserWindow 作成されたウィンドウインスタンス（コンテンツ読み込みは非同期で継続）
  */
-function createMainWindow(): BrowserWindow {
+function createMainWindow({ showWhenReady = true }: { showWhenReady?: boolean } = {}): BrowserWindow {
   // === 前回状態の復元 ===
   // 何をする部分か：DBに保存された前回のウィンドウ位置・サイズ・モード設定を取得
   // なぜ必要か：「最後に開いたところ」を再現するため
@@ -173,8 +175,9 @@ function createMainWindow(): BrowserWindow {
   // なぜ必要か：システムトレイ連携とアプリの適切なライフサイクル管理のため
 
   // ウィンドウ準備完了後の表示
+  // 自動起動時は表示せず、内容だけ読み込んでおく（ショートカット等で開いたときに即座に出せるように）
   window.once('ready-to-show', () => {
-    if (window) {
+    if (window && showWhenReady) {
       window.show();
       if (isDev) {
         window.webContents.openDevTools(); // 開発時のみDevToolsを開く
@@ -252,14 +255,22 @@ function createMainWindow(): BrowserWindow {
  * なぜ必要か：起動処理中も進捗をユーザーに見せ、体感速度を改善するため
  */
 async function initializeApp(): Promise<void> {
+  // === 自動起動（トレイ常駐）かどうかの判定 ===
+  // 何をする部分か：OSログイン時の自動起動なら、スプラッシュもメインウィンドウも表示しない
+  // なぜ必要か：ログイン直後に勝手にウィンドウが出るのを避けつつ、裏で起動を済ませておき、
+  //           使いたい時にショートカットやトレイから待たずに開けるようにするため
+  const launchedHidden = wasLaunchedHidden();
+
   // === スプラッシュ画面を即座に表示 ===
   // 何をする部分か：他の初期化処理より先にスプラッシュを表示し、進捗を通知開始
   // なぜ必要か：DB初期化等に時間がかかっても「何も起きていない」状態を見せないため
-  splashWindow = createSplashWindow();
-  sendSplashProgress(splashWindow, 10, '起動中...');
+  if (!launchedHidden) {
+    splashWindow = createSplashWindow();
+    sendSplashProgress(splashWindow, 10, '起動中...');
+  }
 
   try {
-    log.info(`アプリケーションを初期化中... (開発モード: ${isDev})`);
+    log.info(`アプリケーションを初期化中... (開発モード: ${isDev}, トレイ常駐で起動: ${launchedHidden})`);
 
     // === データベース初期化 ===
     // 何をする部分か：SQLiteデータベースのセットアップ
@@ -288,7 +299,7 @@ async function initializeApp(): Promise<void> {
     // === メインウィンドウ作成 ===
     // 何をする部分か：ウィンドウ生成とコンテンツ読み込み開始(読み込み完了は待たない)
     // なぜ必要か：トレイ・ショートカット準備をページ読み込みと並行させるため
-    mainWindow = createMainWindow();
+    mainWindow = createMainWindow({ showWhenReady: !launchedHidden });
     sendSplashProgress(splashWindow, 75, 'トレイを準備中...');
 
     // === コンテンツ読み込み失敗時のフェイルセーフ ===

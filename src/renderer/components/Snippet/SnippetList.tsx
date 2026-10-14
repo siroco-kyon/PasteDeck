@@ -23,7 +23,7 @@ import {
   DropResult,
 } from '@hello-pangea/dnd';
 import SnippetCard from './SnippetCard';
-import type { Snippet } from '@/shared/types';
+import type { Snippet, Category } from '@/shared/types';
 
 // === スニペット一覧コンポーネント ===
 // 何をする部分か：スニペットをグリッドまたはリスト形式で表示し、DnD並び替えをサポート
@@ -42,6 +42,8 @@ interface SnippetListProps {
   onTagClick?: (tag: string) => void;
   activeTagFilter?: string;   // 現在適用中のタグフィルター
   onClearTagFilter?: () => void; // タグフィルター解除
+  searchActive?: boolean;        // 全カテゴリ検索中か（件数表示・カテゴリ名表示・空状態の文言を切り替える）
+  categories?: Category[];       // 検索結果にカテゴリ名を表示するための一覧
 }
 
 const SnippetList: React.FC<SnippetListProps> = ({
@@ -57,6 +59,8 @@ const SnippetList: React.FC<SnippetListProps> = ({
   onTagClick,
   activeTagFilter,
   onClearTagFilter,
+  searchActive = false,
+  categories = [],
 }) => {
   // === 表示モード管理 ===
   // 何をする部分か：グリッド表示とDnD対応リスト表示を切り替え
@@ -120,6 +124,14 @@ const SnippetList: React.FC<SnippetListProps> = ({
     return [...localSnippets].sort((a, b) => b.useCount - a.useCount);
   }, [localSnippets, sortByUsage]);
 
+  // === カテゴリID → カテゴリの対応表 ===
+  // 何をする部分か：全カテゴリ検索中だけ、各カードに渡す所属カテゴリを引けるようにする
+  // なぜ必要か：検索中以外はタブで所属が明らかなので、カードにカテゴリ名を出さないため
+  const categoryById = useMemo(
+    () => (searchActive ? new Map(categories.map(c => [c.id, c])) : null),
+    [searchActive, categories]
+  );
+
   // === ローディング表示 ===
   if (loading) {
     return (
@@ -146,11 +158,15 @@ const SnippetList: React.FC<SnippetListProps> = ({
             py: 4,
           }}
         >
+          {/* 何をする部分か：検索中かどうかで案内文を切り替える */}
+          {/* なぜ必要か：検索で0件のときに「作成しましょう」と案内すると状況と合わないため */}
           <Typography variant="h6" color="text.secondary" gutterBottom>
-            スニペットがありません
+            {searchActive ? '一致するスニペットはありません' : 'スニペットがありません'}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            右下の「+」ボタンから新しいスニペットを作成しましょう
+            {searchActive
+              ? '全カテゴリを検索しました。Esc キーで検索をクリアできます'
+              : '右下の「+」ボタンから新しいスニペットを作成しましょう'}
           </Typography>
         </Box>
 
@@ -191,7 +207,7 @@ const SnippetList: React.FC<SnippetListProps> = ({
       {/* === ヘッダー: 件数 + ボタン群 === */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, px: 1 }}>
         <Typography variant="body2" color="text.secondary">
-          {localSnippets.length} 件のスニペット
+          {searchActive ? `全カテゴリから ${localSnippets.length} 件` : `${localSnippets.length} 件のスニペット`}
           {viewMode === 'list' && !sortByUsage && (
             <Typography component="span" variant="caption" color="primary.main" sx={{ ml: 1 }}>
               （ドラッグで並び替え可能）
@@ -249,6 +265,7 @@ const SnippetList: React.FC<SnippetListProps> = ({
                 onDuplicate={() => onSnippetDuplicate(snippet)}
                 onFavoriteToggle={onDataChange}
                 onTagClick={onTagClick}
+                category={categoryById?.get(snippet.categoryId)}
               />
             </Grid>
           ))}
@@ -288,6 +305,7 @@ const SnippetList: React.FC<SnippetListProps> = ({
                           onTagClick={onTagClick}
                           dragHandleProps={provided.dragHandleProps || undefined}
                           isDragging={snapshot.isDragging}
+                          category={categoryById?.get(snippet.categoryId)}
                         />
                       </Box>
                     )}

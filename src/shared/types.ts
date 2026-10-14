@@ -95,7 +95,7 @@ export interface UpdateCategoryInput {
  */
 export interface SearchFilters {
   query?: string; // タイトル・コンテンツ・タグでの文字列検索
-  categoryId?: number; // 特定カテゴリでの絞り込み
+  categoryId?: number; // 特定カテゴリでの絞り込み（キーワード・タグ検索中はUI側で外し全カテゴリ対象にする）
   contentType?: ContentType; // コンテンツタイプでの絞り込み
   isFavorite?: boolean; // お気に入りのみ表示
   tags?: string[]; // 特定タグでの絞り込み
@@ -117,9 +117,10 @@ export interface AppSettings {
   windowX?: number; // ウィンドウX座標
   windowY?: number; // ウィンドウY座標
   isMaximized?: boolean; // 前回終了時にウィンドウが最大化されていたか
+  lastCategoryId?: number | null; // 前回選択していたカテゴリタブ（null＝「すべて」、未保存＝undefined）
 
   // === 機能設定 ===
-  autoStart: boolean; // OS起動時の自動開始
+  autoStart: boolean; // OS起動時の自動開始（ウィンドウは出さずトレイに常駐。取得時はOSの実際の登録状態）
   minimizeToTray: boolean; // トレイへの最小化
   showNotifications: boolean; // 通知表示の有効/無効
   maxRecentItems: number; // 最近使用したスニペットの表示数
